@@ -346,10 +346,10 @@ function runBattle(roomCode, engine) {
   }, totalDuration);
 }
 
-// Auto-advance phases
+// Auto-advance phases (only when both players are connected)
 setInterval(() => {
   for (const [roomCode, engine] of games) {
-    if (engine.phase === 'preparation' && engine.players.size === 2) {
+    if (engine.phase === 'preparation' && engine.players.size === 2 && engine.getConnectedPlayerCount() === 2) {
       engine.phaseTimer--;
       if (engine.phaseTimer <= 0) {
         runBattle(roomCode, engine);

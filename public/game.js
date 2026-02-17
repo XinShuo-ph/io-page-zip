@@ -208,7 +208,8 @@ function leaveGame() {
 
 function copyRoomCode() {
   if (!myRoomCode) return;
-  const fullText = '金铲铲之战 - 房间号: ' + myRoomCode + ' 链接: ' + window.location.href.split('?')[0];
+  const link = getRoomLink(myRoomCode);
+  const fullText = '金铲铲之战 - 点击直接加入: ' + link;
   if (navigator.clipboard) {
     navigator.clipboard.writeText(fullText).then(() => {
       const fb = document.getElementById('copyFeedback');
@@ -229,7 +230,7 @@ socket.on('game_created', ({ roomCode, playerId }) => {
   document.getElementById('waitingRoom').style.display = 'block';
   document.getElementById('roomCodeDisplay').textContent = roomCode;
   document.getElementById('roomCodeReminder').textContent = roomCode;
-  document.getElementById('gameLink').textContent = window.location.href.split('?')[0];
+  document.getElementById('gameLink').textContent = getRoomLink(roomCode);
   const bar = document.getElementById('rejoinBar');
   if (bar) bar.style.display = 'none';
 });
@@ -625,3 +626,23 @@ document.addEventListener('keydown', (e) => {
     if (code) joinGame(); else createGame();
   }
 });
+
+// ===== URL房间号参数 =====
+function getRoomLink(roomCode) {
+  const base = window.location.origin + window.location.pathname;
+  return base + '?room=' + roomCode;
+}
+
+// 页面加载时检查URL里的 ?room= 参数
+(function checkUrlRoom() {
+  const params = new URLSearchParams(window.location.search);
+  const room = (params.get('room') || '').toUpperCase().trim();
+  if (room && room.length === 4) {
+    const input = document.getElementById('roomCodeInput');
+    if (input) {
+      input.value = room;
+      // 滚动到加入区域
+      setTimeout(() => input.focus(), 500);
+    }
+  }
+})();
