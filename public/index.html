@@ -8,37 +8,71 @@
   <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>⚔️</text></svg>">
 </head>
 <body>
-  <!-- Lobby Screen -->
+  <!-- ===== LOBBY SCREEN ===== -->
   <div id="lobby" class="screen active">
     <div class="lobby-container">
       <h1 class="game-title">⚔️ 金铲铲<br><span class="subtitle">Auto-Battler</span></h1>
-      <p class="description">Recruit champions, build synergies, battle automatically!</p>
+      <p class="description">A 2-player auto-chess battle game inspired by TFT / 金铲铲之战</p>
 
-      <div class="lobby-form">
-        <input type="text" id="playerName" placeholder="Your Name" maxlength="12" class="input-field">
+      <!-- Main Menu -->
+      <div id="lobbyMenu" class="lobby-form">
+        <input type="text" id="playerName" placeholder="Enter your name" maxlength="12" class="input-field">
 
         <button id="btnCreate" class="btn btn-primary" onclick="createGame()">
-          🎮 Create Game
+          🎮 Create New Game
         </button>
 
-        <div class="divider"><span>or</span></div>
+        <div class="divider"><span>or join a friend</span></div>
 
-        <input type="text" id="roomCodeInput" placeholder="Room Code" maxlength="4" class="input-field" style="text-transform:uppercase">
+        <input type="text" id="roomCodeInput" placeholder="Enter 4-letter Room Code" maxlength="4" class="input-field" style="text-transform:uppercase">
         <button id="btnJoin" class="btn btn-secondary" onclick="joinGame()">
           🤝 Join Game
         </button>
+
+        <!-- How to Play -->
+        <div class="how-to-play">
+          <h3>📖 How to Play</h3>
+          <ol>
+            <li><strong>Create</strong> a game and share the Room Code with a friend</li>
+            <li><strong>Buy</strong> champions from the shop using gold</li>
+            <li><strong>Place</strong> them from bench onto your board</li>
+            <li><strong>Match traits</strong> (e.g. 2 Warriors) for bonus stats</li>
+            <li><strong>Battle</strong> happens automatically every 30 seconds</li>
+            <li><strong>Win</strong> by reducing your opponent's HP to 0!</li>
+          </ol>
+        </div>
       </div>
 
-      <div id="waitingMsg" class="waiting-msg" style="display:none">
-        <div class="spinner"></div>
-        <p>Room: <strong id="roomCodeDisplay"></strong></p>
-        <p>Share this code with your opponent!</p>
-        <p class="waiting-text">Waiting for player 2...</p>
+      <!-- Waiting Room (shown after creating game) -->
+      <div id="waitingRoom" style="display:none">
+        <div class="waiting-card">
+          <div class="spinner"></div>
+          <p class="waiting-label">Your Room Code:</p>
+          <div class="room-code-display">
+            <span id="roomCodeDisplay">----</span>
+          </div>
+          <button class="btn btn-copy" onclick="copyRoomCode()">
+            📋 Copy Room Code
+          </button>
+          <p id="copyFeedback" class="copy-feedback" style="display:none">Copied!</p>
+
+          <div class="invite-instructions">
+            <p><strong>How to invite your opponent:</strong></p>
+            <ol>
+              <li>Send them this link: <span class="link-text" id="gameLink"></span></li>
+              <li>They open it on their phone/browser</li>
+              <li>They enter the room code <strong id="roomCodeReminder">----</strong> and tap "Join Game"</li>
+            </ol>
+          </div>
+
+          <p class="waiting-text">⏳ Waiting for opponent to join...</p>
+          <button class="btn btn-secondary btn-cancel" onclick="location.reload()">Cancel</button>
+        </div>
       </div>
     </div>
   </div>
 
-  <!-- Game Screen -->
+  <!-- ===== GAME SCREEN ===== -->
   <div id="game" class="screen">
     <!-- Top Bar -->
     <div class="top-bar">
@@ -74,15 +108,15 @@
     <div class="traits-bar" id="traitsBar"></div>
 
     <!-- Opponent Board (read-only, small) -->
-    <div class="section-label">Opponent's Board</div>
+    <div class="section-label">⚔️ Opponent's Board</div>
     <div class="board-container opponent-board" id="opponentBoard"></div>
 
     <!-- Player Board -->
-    <div class="section-label">Your Board <span class="hint">(tap bench unit, then tap board cell)</span></div>
+    <div class="section-label">🏰 Your Board <span class="hint">(tap bench unit, then tap a board cell to place)</span></div>
     <div class="board-container player-board" id="playerBoard"></div>
 
     <!-- Bench -->
-    <div class="section-label">Bench <span class="hint">(tap to select/sell)</span></div>
+    <div class="section-label">💺 Bench <span class="hint">(tap to select, tap board to place, double-tap to sell)</span></div>
     <div class="bench-container" id="benchContainer"></div>
 
     <!-- Shop -->
@@ -90,8 +124,8 @@
       <div class="shop-header">
         <span>🏪 Shop</span>
         <div class="shop-buttons">
-          <button class="btn btn-sm" onclick="buyXP()">📈 Buy XP (4g)</button>
-          <button class="btn btn-sm" onclick="refreshShop()">🔄 Refresh (2g)</button>
+          <button class="btn btn-sm" onclick="buyXP()">📈 XP (4💰)</button>
+          <button class="btn btn-sm" onclick="refreshShop()">🔄 Reroll (2💰)</button>
         </div>
       </div>
       <div class="shop-cards" id="shopCards"></div>

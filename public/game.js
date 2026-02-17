@@ -3,6 +3,7 @@ const socket = io();
 let gameState = null;
 let selectedBenchIndex = null;
 let selectedBoardCell = null;
+let myRoomCode = null;
 
 // ===== LOBBY =====
 function createGame() {
@@ -13,32 +14,61 @@ function createGame() {
 function joinGame() {
   const name = document.getElementById('playerName').value.trim() || 'Player 2';
   const roomCode = document.getElementById('roomCodeInput').value.trim().toUpperCase();
-  if (!roomCode) {
-    showError('Enter a room code');
+  if (!roomCode || roomCode.length < 4) {
+    showError('Enter a valid 4-letter room code');
     return;
   }
   socket.emit('join_game', { roomCode, playerName: name });
 }
 
-socket.on('game_created', ({ roomCode }) => {
-  document.getElementById('waitingMsg').style.display = 'block';
+function copyRoomCode() {
+  if (!myRoomCode) return;
+  const fullText = window.location.href.split('?')[0] + ' - Room Code: ' + myRoomCode;
+  if (navigator.clipboard) {
+    navigator.clipboard.writeText(fullText).then(() => {
+      const fb = document.getElementById('copyFeedback');
+      fb.style.display = 'block';
+      fb.textContent = 'Copied to clipboard!';
+      setTimeout(() => { fb.style.display = 'none'; }, 2000);
+    });
+  } else {
+    prompt('Copy this and send to your friend:', fullText);
+  }
+}
+
+// When game is created, show waiting room with room code (stay on lobby screen!)
+socket.on('game_created', ({ roomCode, playerId }) => {
+  myRoomCode = roomCode;
+  document.getElementById('lobbyMenu').style.display = 'none';
+  document.getElementById('waitingRoom').style.display = 'block';
   document.getElementById('roomCodeDisplay').textContent = roomCode;
-  document.getElementById('btnCreate').style.display = 'none';
-  document.getElementById('btnJoin').style.display = 'none';
-  document.getElementById('roomCodeInput').style.display = 'none';
-  document.querySelector('.divider').style.display = 'none';
+  document.getElementById('roomCodeReminder').textContent = roomCode;
+  document.getElementById('gameLink').textContent = window.location.href.split('?')[0];
 });
 
+// When joined a game, show a brief message (game_state will trigger transition)
 socket.on('game_joined', () => {
-  // Will transition when game_state arrives
+  // Transition happens when game_started + game_state arrives
+});
+
+// Game started signal: now we know it's time to switch to game screen
+socket.on('game_started', () => {
+  // Transition will happen when game_state arrives right after this
 });
 
 // ===== GAME STATE =====
 socket.on('game_state', (state) => {
+  // Only switch to game screen if the game has actually started (round > 0)
+  if (state.phase === 'waiting' || state.round === 0) {
+    // Game hasn't started yet, stay on lobby
+    return;
+  }
+
   gameState = state;
 
   // Switch to game screen
   document.getElementById('lobby').classList.remove('active');
+  document.getElementById('lobby').style.display = 'none';
   const gameEl = document.getElementById('game');
   gameEl.classList.add('active');
   gameEl.style.display = 'flex';
@@ -58,12 +88,9 @@ socket.on('phase_change', ({ phase, round, timer }) => {
 socket.on('timer_update', (t) => {
   if (gameState) {
     gameState.timer = t;
-    document.getElementById('timerDisplay').textContent = t + 's';
-    if (t <= 5) {
-      document.getElementById('timerDisplay').style.color = '#ef4444';
-    } else {
-      document.getElementById('timerDisplay').style.color = '';
-    }
+    const el = document.getElementById('timerDisplay');
+    el.textContent = t + 's';
+    el.style.color = t <= 5 ? '#ef4444' : '';
   }
 });
 
@@ -108,7 +135,16 @@ function renderTopBar() {
   document.getElementById('myName').textContent = p.name;
   document.getElementById('myHp').textContent = p.hp;
   document.getElementById('roundDisplay').textContent = `Round ${gameState.round}`;
-  document.getElementById('phaseDisplay').textContent = gameState.phase === 'preparation' ? '🛠 Preparation' : '⚔️ Battle';
+
+  const phaseEl = document.getElementById('phaseDisplay');
+  if (gameState.phase === 'preparation') {
+    phaseEl.textContent = '🛠 Prep';
+    phaseEl.style.borderColor = 'var(--gold-dark)';
+  } else {
+    phaseEl.textContent = '⚔️ Battle';
+    phaseEl.style.borderColor = 'var(--red)';
+  }
+
   document.getElementById('timerDisplay').textContent = gameState.timer + 's';
   document.getElementById('goldDisplay').textContent = p.gold;
   document.getElementById('levelDisplay').textContent = p.level;
@@ -116,10 +152,10 @@ function renderTopBar() {
   document.getElementById('unitCount').textContent = `${p.boardCount}/${p.maxUnits}`;
 
   if (p.streak > 0) {
-    document.getElementById('streakDisplay').textContent = `🔥 ${p.streak}W`;
+    document.getElementById('streakDisplay').textContent = `🔥${p.streak}W`;
     document.getElementById('streakDisplay').style.color = '#4ade80';
   } else if (p.streak < 0) {
-    document.getElementById('streakDisplay').textContent = `💀 ${Math.abs(p.streak)}L`;
+    document.getElementById('streakDisplay').textContent = `💀${Math.abs(p.streak)}L`;
     document.getElementById('streakDisplay').style.color = '#ef4444';
   } else {
     document.getElementById('streakDisplay').textContent = '';
@@ -130,7 +166,6 @@ function renderTopBar() {
     document.getElementById('oppHp').textContent = o.hp;
   }
 
-  // HP bar color
   const hpEl = document.getElementById('myHp');
   hpEl.parentElement.style.color = p.hp > 50 ? '#4ade80' : p.hp > 25 ? '#fbbf24' : '#ef4444';
 }
@@ -139,7 +174,7 @@ function renderTraits() {
   const bar = document.getElementById('traitsBar');
   const traits = gameState.player.activeTraits || [];
   bar.innerHTML = traits.map(t =>
-    `<div class="trait-badge active">${t.icon} ${t.name} (${t.count}/${t.threshold})</div>`
+    `<div class="trait-badge active">${t.icon} ${t.name} ${t.count}/${t.threshold}</div>`
   ).join('');
 }
 
@@ -147,7 +182,7 @@ function renderOpponentBoard() {
   const container = document.getElementById('opponentBoard');
   const o = gameState.opponent;
   if (!o || !o.board) {
-    container.innerHTML = '<div style="padding:1rem;text-align:center;color:var(--text-dim);font-size:0.8rem;">Waiting for opponent...</div>';
+    container.innerHTML = '';
     return;
   }
 
@@ -227,11 +262,11 @@ function renderShop() {
   for (let i = 0; i < 5; i++) {
     const champ = shop[i];
     if (champ) {
-      const traitText = champ.traits.join(', ');
+      const traitText = champ.traits.join(' ');
       html += `<div class="shop-card cost-${champ.cost}" onclick="buyChampion(${i})">
         <div class="emoji">${champ.emoji}</div>
         <div class="name">${champ.name}</div>
-        <div class="cost">💰 ${champ.cost}</div>
+        <div class="cost">💰${champ.cost}</div>
         <div class="traits">${traitText}</div>
       </div>`;
     } else {
@@ -245,8 +280,8 @@ function renderShop() {
 function onBenchClick(index) {
   const unit = gameState.player.bench[index];
 
+  // If board cell was selected, return it to this bench slot
   if (selectedBoardCell) {
-    // Board cell was selected, now clicking bench - return board unit if bench slot empty
     if (!unit) {
       socket.emit('return_to_bench', {
         boardRow: selectedBoardCell.row,
@@ -260,8 +295,12 @@ function onBenchClick(index) {
     return;
   }
 
+  // Toggle bench selection
   if (selectedBenchIndex === index) {
-    // Deselect
+    // Double-tap = sell
+    if (unit) {
+      socket.emit('sell_champion', { from: 'bench', index: index });
+    }
     selectedBenchIndex = null;
     renderBench();
     return;
@@ -293,9 +332,9 @@ function onBoardCellClick(row, col) {
   // If a board cell is selected, move/swap
   if (selectedBoardCell) {
     if (selectedBoardCell.row === row && selectedBoardCell.col === col) {
-      // Deselect
+      // Double-tap on board: return to bench
+      socket.emit('return_to_bench', { boardRow: row, boardCol: col });
       selectedBoardCell = null;
-      renderPlayerBoard();
       return;
     }
 
@@ -338,12 +377,14 @@ function showBattle(log) {
   logContainer.innerHTML = '';
 
   let i = 0;
+  const speed = Math.max(150, Math.min(600, 8000 / (log.length || 1)));
+
   const interval = setInterval(() => {
     if (i >= log.length) {
       clearInterval(interval);
       setTimeout(() => {
         overlay.style.display = 'none';
-      }, 1500);
+      }, 1200);
       return;
     }
 
@@ -354,30 +395,30 @@ function showBattle(log) {
     switch (entry.type) {
       case 'attack':
         div.className += ' log-attack';
-        div.textContent = `${entry.attacker.emoji} ${entry.attacker.name} hits ${entry.target.emoji} ${entry.target.name} for ${entry.damage} dmg (${entry.targetHp}/${entry.targetMaxHp} HP)`;
+        div.textContent = `${entry.attacker.emoji} ${entry.attacker.name} → ${entry.target.emoji} ${entry.target.name} -${entry.damage} (${entry.targetHp}hp)`;
         break;
       case 'crit':
         div.className += ' log-crit';
-        div.textContent = `💥 ${entry.attacker.emoji} ${entry.attacker.name} CRITS ${entry.target.emoji} ${entry.target.name} for ${entry.damage} dmg!`;
+        div.textContent = `💥 CRIT! ${entry.attacker.emoji} ${entry.attacker.name} → ${entry.target.emoji} -${entry.damage}!`;
         break;
       case 'ability':
         div.className += ' log-ability';
-        div.textContent = `✨ ${entry.attacker.emoji} ${entry.attacker.name} uses ${entry.attacker.ability} on ${entry.target.emoji} ${entry.target.name} for ${entry.damage} dmg`;
+        div.textContent = `✨ ${entry.attacker.emoji} ${entry.attacker.ability}! → ${entry.target.emoji} -${entry.damage}`;
         break;
       case 'death':
         div.className += ' log-death';
-        div.textContent = `☠️ ${entry.unit.emoji} ${entry.unit.name} has fallen!`;
+        div.textContent = `☠️ ${entry.unit.emoji} ${entry.unit.name} defeated!`;
         break;
       case 'move':
-        div.className += ' log-move';
-        div.textContent = `→ ${entry.unit.emoji} ${entry.unit.name} moves`;
-        break;
+        // Skip move logs to keep it readable
+        i++;
+        return;
     }
 
     logContainer.appendChild(div);
     logContainer.scrollTop = logContainer.scrollHeight;
     i++;
-  }, 600);
+  }, speed);
 }
 
 // ===== ERROR =====
@@ -385,7 +426,8 @@ function showError(msg) {
   const toast = document.getElementById('errorToast');
   toast.textContent = msg;
   toast.style.display = 'block';
-  setTimeout(() => {
+  clearTimeout(toast._timeout);
+  toast._timeout = setTimeout(() => {
     toast.style.display = 'none';
   }, 2500);
 }

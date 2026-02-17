@@ -33,7 +33,7 @@ io.on('connection', (socket) => {
     playerToGame.set(socket.id, roomCode);
     socket.join(roomCode);
     socket.emit('game_created', { roomCode, playerId: socket.id });
-    socket.emit('game_state', engine.getStateForPlayer(socket.id));
+    // Don't send game_state yet - wait for opponent to join
     console.log(`Game ${roomCode} created by ${playerName}`);
   });
 
@@ -55,6 +55,8 @@ io.on('connection', (socket) => {
 
     if (engine.players.size === 2) {
       engine.startGame();
+      // Notify both players the game is starting
+      io.to(roomCode).emit('game_started');
       for (const [pid] of engine.players) {
         io.to(pid).emit('game_state', engine.getStateForPlayer(pid));
       }
