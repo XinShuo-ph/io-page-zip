@@ -14,6 +14,24 @@ let selectedBoardCell = null;
 let myRoomCode = null;
 let myPlayerName = null;
 let isConnected = false;
+let longPressTimer = null;
+
+// 羁绊中文名映射
+const TRAIT_NAMES = {
+  warrior: '⚔️ 战士', mage: '🔮 法师', ranger: '🏹 游侠', tank: '🛡️ 重装',
+  assassin: '🗡️ 刺客', mystic: '✨ 秘术', dragon: '🐉 龙族', demon: '👹 恶魔',
+};
+
+const TRAIT_DESC = {
+  warrior: '2个:攻击+15 / 3个:攻击+30',
+  mage: '2个:法术+30 / 3个:法术+60',
+  ranger: '2个:攻速+30% / 3个:攻速+60%',
+  tank: '2个:护甲+30 / 3个:护甲+60',
+  assassin: '2个:暴击率+30% / 3个:暴击率+60%',
+  mystic: '2个:魔抗+30 / 3个:魔抗+60',
+  dragon: '2个:攻击+20, 生命+200',
+  demon: '2个:法术+20, 攻击+10',
+};
 
 // ===== Session 持久化 =====
 function saveSession(roomCode, playerName) {
@@ -240,6 +258,7 @@ socket.on('game_state', (state) => {
   }
 
   // 切换到游戏界面
+  const wasOnLobby = document.getElementById('lobby').classList.contains('active');
   document.getElementById('lobby').classList.remove('active');
   document.getElementById('lobby').style.display = 'none';
   const gameEl = document.getElementById('game');
@@ -247,6 +266,11 @@ socket.on('game_state', (state) => {
   gameEl.style.display = 'flex';
 
   renderGame();
+
+  // 首次进入游戏时显示新手提示
+  if (wasOnLobby) {
+    maybeShowTutorial();
+  }
 });
 
 socket.on('phase_change', ({ phase, round, timer }) => {
@@ -289,6 +313,82 @@ socket.on('error_msg', (msg) => {
 
 socket.on('player_left', () => { showError('对手已离开游戏'); });
 socket.on('player_disconnected', () => { showError('对手已断线，等待重连...'); });
+
+// ===== 棋子详情弹窗 =====
+function showCardDetail(unit) {
+  if (!unit) return;
+  const overlay = document.getElementById('cardDetail');
+  const header = document.getElementById('cardDetailHeader');
+  const body = document.getElementById('cardDetailBody');
+  const card = overlay.querySelector('.card-detail');
+  card.className = 'card-detail cd-cost-' + unit.cost;
+
+  const stars = unit.stars ? '⭐'.repeat(unit.stars) : '';
+  const traitTags = (unit.traits || []).map(t => `<span class="cd-trait-tag">${TRAIT_NAMES[t] || t}</span>`).join('');
+
+  header.innerHTML = `
+    <div class="cd-emoji">${unit.emoji}</div>
+    <div class="cd-name">${unit.name} ${stars}</div>
+    <div class="cd-cost">💰 ${unit.cost}费棋子</div>
+    <div class="cd-traits">${traitTags}</div>
+  `;
+
+  const rangeText = unit.range <= 1 ? '近战' : `远程 (${unit.range}格)`;
+  body.innerHTML = `
+    <div class="cd-row"><span class="cd-label">❤️ 生命值</span><span class="cd-value">${unit.hp}</span></div>
+    <div class="cd-row"><span class="cd-label">⚔️ 攻击力</span><span class="cd-value">${unit.attack}</span></div>
+    <div class="cd-row"><span class="cd-label">⏩ 攻击速度</span><span class="cd-value">${unit.attackSpeed}</span></div>
+    <div class="cd-row"><span class="cd-label">🎯 攻击距离</span><span class="cd-value">${rangeText}</span></div>
+    <div class="cd-ability">
+      <div class="cd-ability-name">✨ 技能：${unit.ability}</div>
+      <div class="cd-ability-desc">蓄满法力后释放，造成 ${unit.abilityDmg} 点法术伤害</div>
+    </div>
+    ${(unit.traits || []).map(t => `<div style="font-size:0.7rem;color:var(--text-dim);margin-top:0.3rem">${TRAIT_NAMES[t] || t}：${TRAIT_DESC[t] || ''}</div>`).join('')}
+  `;
+
+  overlay.style.display = 'flex';
+}
+
+function closeCardDetail() {
+  document.getElementById('cardDetail').style.display = 'none';
+}
+
+// 长按检测（用于查看棋子详情）
+function startLongPress(unit, e) {
+  if (e) e.preventDefault();
+  clearTimeout(longPressTimer);
+  longPressTimer = setTimeout(() => {
+    showCardDetail(unit);
+    longPressTimer = -1; // mark as triggered
+  }, 400);
+}
+
+function cancelLongPress() {
+  if (longPressTimer && longPressTimer !== -1) {
+    clearTimeout(longPressTimer);
+  }
+  longPressTimer = null;
+}
+
+function wasLongPress() {
+  return longPressTimer === -1;
+}
+
+// ===== 新手提示 =====
+function showTutorial() {
+  document.getElementById('tutorialOverlay').style.display = 'flex';
+}
+
+function closeTutorial() {
+  document.getElementById('tutorialOverlay').style.display = 'none';
+  localStorage.setItem('tft_tutorial_seen', '1');
+}
+
+function maybeShowTutorial() {
+  if (!localStorage.getItem('tft_tutorial_seen')) {
+    showTutorial();
+  }
+}
 
 // ===== 渲染 =====
 function renderGame() {
@@ -370,13 +470,25 @@ function renderPlayerBoard() {
       const unit = board[r][c];
       const sel = selectedBoardCell && selectedBoardCell.row === r && selectedBoardCell.col === c;
       if (unit) {
-        html += `<div class="board-cell has-unit cost-${unit.cost} ${sel?'selected':''}" onclick="onBoardCellClick(${r},${c})">${unit.emoji}<span class="unit-stars">${'⭐'.repeat(unit.stars)}</span></div>`;
+        html += `<div class="board-cell has-unit cost-${unit.cost} ${sel?'selected':''}"
+          onclick="onBoardTap(${r},${c})"
+          ontouchstart="startLongPress(gameState.player.board[${r}][${c}], event)"
+          ontouchend="cancelLongPress()"
+          onmousedown="startLongPress(gameState.player.board[${r}][${c}], event)"
+          onmouseup="cancelLongPress()"
+          onmouseleave="cancelLongPress()">
+          ${unit.emoji}<span class="unit-stars">${'⭐'.repeat(unit.stars)}</span></div>`;
       } else {
-        html += `<div class="board-cell ${sel?'selected':''}" onclick="onBoardCellClick(${r},${c})"></div>`;
+        html += `<div class="board-cell ${sel?'selected':''}" onclick="onBoardTap(${r},${c})"></div>`;
       }
     }
   }
   container.innerHTML = html;
+}
+
+function onBoardTap(r, c) {
+  if (wasLongPress()) { longPressTimer = null; return; }
+  onBoardCellClick(r, c);
 }
 
 function renderBench() {
@@ -387,12 +499,25 @@ function renderBench() {
     const unit = bench[i];
     const sel = selectedBenchIndex === i;
     if (unit) {
-      html += `<div class="bench-slot has-unit cost-${unit.cost} ${sel?'selected':''}" onclick="onBenchClick(${i})">${unit.emoji}<span class="unit-stars">${'⭐'.repeat(unit.stars)}</span><span class="bench-name">${unit.name}</span></div>`;
+      html += `<div class="bench-slot has-unit cost-${unit.cost} ${sel?'selected':''}"
+        onclick="onBenchTap(${i})"
+        ontouchstart="startLongPress(gameState.player.bench[${i}], event)"
+        ontouchend="cancelLongPress()"
+        onmousedown="startLongPress(gameState.player.bench[${i}], event)"
+        onmouseup="cancelLongPress()"
+        onmouseleave="cancelLongPress()">
+        ${unit.emoji}<span class="unit-stars">${'⭐'.repeat(unit.stars)}</span><span class="bench-name">${unit.name}</span>
+      </div>`;
     } else {
-      html += `<div class="bench-slot" onclick="onBenchClick(${i})"></div>`;
+      html += `<div class="bench-slot" onclick="onBenchTap(${i})"></div>`;
     }
   }
   container.innerHTML = html;
+}
+
+function onBenchTap(i) {
+  if (wasLongPress()) { longPressTimer = null; return; }
+  onBenchClick(i);
 }
 
 function renderShop() {
@@ -402,12 +527,32 @@ function renderShop() {
   for (let i = 0; i < 5; i++) {
     const ch = shop[i];
     if (ch) {
-      html += `<div class="shop-card cost-${ch.cost}" onclick="buyChampion(${i})"><div class="emoji">${ch.emoji}</div><div class="name">${ch.name}</div><div class="cost">💰${ch.cost}</div><div class="traits">${ch.traits.join(' ')}</div></div>`;
+      const traitIcons = (ch.traits || []).map(t => {
+        const n = TRAIT_NAMES[t]; return n ? n.split(' ')[0] : '';
+      }).join('');
+      html += `<div class="shop-card cost-${ch.cost}"
+        onclick="onShopClick(${i})"
+        ontouchstart="startLongPress(gameState.player.shop[${i}], event)"
+        ontouchend="cancelLongPress()"
+        onmousedown="startLongPress(gameState.player.shop[${i}], event)"
+        onmouseup="cancelLongPress()"
+        onmouseleave="cancelLongPress()">
+        <div class="emoji">${ch.emoji}</div>
+        <div class="name">${ch.name}</div>
+        <div class="shop-stats">❤${ch.hp} ⚔${ch.attack}</div>
+        <div class="cost">💰${ch.cost}</div>
+        <div class="traits">${traitIcons} ${(ch.traits || []).map(t => (TRAIT_NAMES[t]||t).replace(/^.+\s/,'')).join(' ')}</div>
+      </div>`;
     } else {
       html += `<div class="shop-card empty"><div class="emoji">-</div></div>`;
     }
   }
   container.innerHTML = html;
+}
+
+function onShopClick(i) {
+  if (wasLongPress()) { longPressTimer = null; return; }
+  buyChampion(i);
 }
 
 // ===== 交互操作 =====

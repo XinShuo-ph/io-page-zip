@@ -123,11 +123,11 @@
     <div class="board-container opponent-board" id="opponentBoard"></div>
 
     <!-- 我的棋盘 -->
-    <div class="section-label">🏰 我的棋盘 <span class="hint">（先点备战席棋子，再点棋盘格子放置）</span></div>
+    <div class="section-label">🏰 我的棋盘 <span class="hint">（先点备战席棋子，再点格子放置；长按查看详情）</span></div>
     <div class="board-container player-board" id="playerBoard"></div>
 
     <!-- 备战席 -->
-    <div class="section-label">💺 备战席 <span class="hint">（点击选中，双击出售）</span></div>
+    <div class="section-label">💺 备战席 <span class="hint">（点击选中，双击出售，长按查看详情）</span></div>
     <div class="bench-container" id="benchContainer"></div>
 
     <!-- 商店 -->
@@ -137,7 +137,8 @@
         <div class="shop-buttons">
           <button class="btn btn-sm" onclick="buyXP()">📈 买经验(4💰)</button>
           <button class="btn btn-sm" onclick="refreshShop()">🔄 刷新(2💰)</button>
-          <button class="btn btn-sm btn-leave" onclick="leaveGame()">🚪 退出</button>
+          <button class="btn btn-sm" onclick="showTutorial()">❓</button>
+          <button class="btn btn-sm btn-leave" onclick="leaveGame()">🚪</button>
         </div>
       </div>
       <div class="shop-cards" id="shopCards"></div>
@@ -157,6 +158,74 @@
         <h1 id="gameOverTitle">胜利！</h1>
         <p id="gameOverMsg"></p>
         <button class="btn btn-primary" onclick="location.reload()">再来一局</button>
+      </div>
+    </div>
+
+    <!-- 棋子详情弹窗 -->
+    <div id="cardDetail" class="card-detail-overlay" style="display:none" onclick="closeCardDetail()">
+      <div class="card-detail" onclick="event.stopPropagation()">
+        <div class="card-detail-header" id="cardDetailHeader"></div>
+        <div class="card-detail-body" id="cardDetailBody"></div>
+        <button class="btn btn-sm" onclick="closeCardDetail()" style="margin-top:0.5rem;width:100%">关闭</button>
+      </div>
+    </div>
+
+    <!-- 新手提示浮层 -->
+    <div id="tutorialOverlay" class="tutorial-overlay" style="display:none">
+      <div class="tutorial-content">
+        <h2>📖 新手指南</h2>
+        <div class="tutorial-steps">
+          <div class="tutorial-step">
+            <div class="tutorial-icon">🏪</div>
+            <div>
+              <strong>商店购买</strong>
+              <p>点击底部商店的棋子卡片购买（需要金币）。长按卡片可查看详细属性。</p>
+            </div>
+          </div>
+          <div class="tutorial-step">
+            <div class="tutorial-icon">💺</div>
+            <div>
+              <strong>备战席 → 棋盘</strong>
+              <p>先点击备战席上的棋子（变金色），再点棋盘上的空格放置。双击备战席棋子可出售。</p>
+            </div>
+          </div>
+          <div class="tutorial-step">
+            <div class="tutorial-icon">⭐</div>
+            <div>
+              <strong>升星系统</strong>
+              <p>买3个相同棋子自动合成为2星（属性×1.8），3个2星合成3星（属性×3.2）！</p>
+            </div>
+          </div>
+          <div class="tutorial-step">
+            <div class="tutorial-icon">⚔️</div>
+            <div>
+              <strong>羁绊加成</strong>
+              <p>棋盘上同羁绊棋子达到数量门槛时激活加成。如2个战士 → 攻击+15。</p>
+            </div>
+          </div>
+          <div class="tutorial-step">
+            <div class="tutorial-icon">💰</div>
+            <div>
+              <strong>经济管理</strong>
+              <p>每回合基础+5金。存款每10金+1利息（最多+5）。连胜/连败也有额外收入。</p>
+            </div>
+          </div>
+          <div class="tutorial-step">
+            <div class="tutorial-icon">📈</div>
+            <div>
+              <strong>等级与上阵数</strong>
+              <p>等级=最多上阵棋子数。花4金买经验可加速升级，等级越高商店出好棋概率越大。</p>
+            </div>
+          </div>
+          <div class="tutorial-step">
+            <div class="tutorial-icon">⏱️</div>
+            <div>
+              <strong>战斗规则</strong>
+              <p>每30秒自动战斗。输的一方扣血（扣血=回合数+对方存活棋子数）。血量归0即淘汰！</p>
+            </div>
+          </div>
+        </div>
+        <button class="btn btn-primary" onclick="closeTutorial()" style="margin-top:1rem">👍 知道了，开始游戏！</button>
       </div>
     </div>
 

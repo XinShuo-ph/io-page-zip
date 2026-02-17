@@ -589,10 +589,11 @@ body {
 .shop-card.cost-3 { border-color: var(--cost3); }
 .shop-card.cost-4 { border-color: var(--cost4); }
 
-.shop-card .emoji { font-size: 1.2rem; }
+.shop-card .emoji { font-size: 1.1rem; }
 .shop-card .name { font-size: 0.5rem; font-weight: 600; margin-top: 0.05rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.shop-card .cost { font-size: 0.55rem; color: var(--gold); font-weight: 700; }
-.shop-card .traits { font-size: 0.45rem; color: var(--text-dim); }
+.shop-card .shop-stats { font-size: 0.42rem; color: var(--text-dim); line-height: 1.2; }
+.shop-card .cost { font-size: 0.5rem; color: var(--gold); font-weight: 700; }
+.shop-card .traits { font-size: 0.42rem; color: var(--text-dim); line-height: 1.2; }
 
 .shop-card.empty {
   opacity: 0.3;
@@ -673,6 +674,139 @@ body {
 
 .victory { color: var(--gold); }
 .defeat { color: var(--red); }
+
+/* ===== CARD DETAIL POPUP ===== */
+.card-detail-overlay {
+  position: fixed;
+  top: 0; left: 0; right: 0; bottom: 0;
+  background: rgba(0, 0, 0, 0.7);
+  z-index: 150;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1rem;
+}
+
+.card-detail {
+  background: var(--bg2);
+  border-radius: 16px;
+  padding: 1rem 1.2rem;
+  width: 100%;
+  max-width: 320px;
+  border: 2px solid var(--border);
+}
+
+.card-detail-header {
+  text-align: center;
+  padding-bottom: 0.6rem;
+  border-bottom: 1px solid var(--border);
+  margin-bottom: 0.6rem;
+}
+
+.card-detail-header .cd-emoji { font-size: 2.2rem; }
+.card-detail-header .cd-name { font-size: 1.1rem; font-weight: 700; margin-top: 0.2rem; }
+.card-detail-header .cd-cost { font-size: 0.8rem; color: var(--gold); font-weight: 600; }
+.card-detail-header .cd-stars { color: var(--gold); font-size: 0.8rem; }
+.card-detail-header .cd-traits { margin-top: 0.3rem; display: flex; gap: 0.3rem; justify-content: center; flex-wrap: wrap; }
+.card-detail-header .cd-trait-tag {
+  font-size: 0.7rem;
+  padding: 0.15rem 0.5rem;
+  border-radius: 99px;
+  background: rgba(255, 215, 0, 0.1);
+  border: 1px solid var(--gold-dark);
+  color: var(--gold);
+}
+
+.card-detail-body { font-size: 0.8rem; }
+.card-detail-body .cd-row {
+  display: flex;
+  justify-content: space-between;
+  padding: 0.25rem 0;
+  border-bottom: 1px solid rgba(255,255,255,0.04);
+}
+.card-detail-body .cd-label { color: var(--text-dim); }
+.card-detail-body .cd-value { font-weight: 600; }
+.card-detail-body .cd-ability {
+  margin-top: 0.5rem;
+  padding: 0.5rem;
+  background: rgba(168, 85, 247, 0.1);
+  border: 1px solid rgba(168, 85, 247, 0.25);
+  border-radius: 8px;
+}
+.card-detail-body .cd-ability-name { color: var(--purple); font-weight: 700; font-size: 0.85rem; }
+.card-detail-body .cd-ability-desc { color: var(--text-dim); font-size: 0.75rem; margin-top: 0.15rem; }
+
+/* Cost colors for card detail */
+.card-detail.cd-cost-1 { border-color: var(--cost1); }
+.card-detail.cd-cost-2 { border-color: var(--cost2); }
+.card-detail.cd-cost-3 { border-color: var(--cost3); }
+.card-detail.cd-cost-4 { border-color: var(--cost4); }
+
+/* ===== TUTORIAL OVERLAY ===== */
+.tutorial-overlay {
+  position: fixed;
+  top: 0; left: 0; right: 0; bottom: 0;
+  background: rgba(0, 0, 0, 0.92);
+  z-index: 250;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1rem;
+}
+
+.tutorial-content {
+  background: var(--bg2);
+  border: 2px solid var(--gold-dark);
+  border-radius: 16px;
+  padding: 1.2rem;
+  max-width: 400px;
+  width: 100%;
+  max-height: 85vh;
+  overflow-y: auto;
+}
+
+.tutorial-content h2 {
+  text-align: center;
+  color: var(--gold);
+  margin-bottom: 1rem;
+  font-size: 1.3rem;
+}
+
+.tutorial-steps {
+  display: flex;
+  flex-direction: column;
+  gap: 0.7rem;
+}
+
+.tutorial-step {
+  display: flex;
+  gap: 0.7rem;
+  align-items: flex-start;
+  padding: 0.6rem;
+  background: var(--bg3);
+  border-radius: 10px;
+  border: 1px solid var(--border);
+}
+
+.tutorial-icon {
+  font-size: 1.5rem;
+  flex-shrink: 0;
+  width: 2rem;
+  text-align: center;
+}
+
+.tutorial-step strong {
+  font-size: 0.85rem;
+  color: var(--text);
+  display: block;
+  margin-bottom: 0.1rem;
+}
+
+.tutorial-step p {
+  font-size: 0.75rem;
+  color: var(--text-dim);
+  line-height: 1.5;
+}
 
 /* ===== ERROR TOAST ===== */
 .error-toast {
