@@ -67,6 +67,27 @@ body {
   -webkit-text-fill-color: var(--text-dim);
 }
 
+.connection-status {
+  font-size: 0.75rem;
+  padding: 0.3rem 0.8rem;
+  border-radius: 99px;
+  display: inline-block;
+  margin-bottom: 0.8rem;
+}
+
+.connection-status.connected {
+  background: rgba(74, 222, 128, 0.15);
+  color: var(--green);
+  border: 1px solid rgba(74, 222, 128, 0.3);
+}
+
+.connection-status.disconnected {
+  background: rgba(239, 68, 68, 0.15);
+  color: var(--red);
+  border: 1px solid rgba(239, 68, 68, 0.3);
+  animation: pulse 1.5s ease-in-out infinite;
+}
+
 .description {
   color: var(--text-dim);
   margin-bottom: 1.5rem;

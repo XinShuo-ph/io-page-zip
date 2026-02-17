@@ -1,24 +1,99 @@
-const socket = io();
+// Connect with explicit transports to ensure reliability through proxies/tunnels
+const socket = io({
+  transports: ['polling', 'websocket'],
+  upgrade: true,
+  reconnection: true,
+  reconnectionAttempts: 10,
+  reconnectionDelay: 1000,
+  reconnectionDelayMax: 5000,
+  timeout: 20000,
+});
 
 let gameState = null;
 let selectedBenchIndex = null;
 let selectedBoardCell = null;
 let myRoomCode = null;
+let isConnected = false;
+
+// ===== 连接状态管理 =====
+function updateConnectionStatus(connected, msg) {
+  isConnected = connected;
+  const el = document.getElementById('connectionStatus');
+  if (!el) return;
+  if (connected) {
+    el.textContent = '🟢 已连接';
+    el.className = 'connection-status connected';
+  } else {
+    el.textContent = '🔴 ' + (msg || '连接中...');
+    el.className = 'connection-status disconnected';
+  }
+  // Enable/disable buttons based on connection
+  const btns = document.querySelectorAll('#btnCreate, #btnJoin');
+  btns.forEach(b => {
+    b.disabled = !connected;
+    b.style.opacity = connected ? '1' : '0.5';
+  });
+}
+
+socket.on('connect', () => {
+  console.log('[Socket] Connected:', socket.id, 'transport:', socket.io.engine.transport.name);
+  updateConnectionStatus(true);
+});
+
+socket.on('disconnect', (reason) => {
+  console.log('[Socket] Disconnected:', reason);
+  updateConnectionStatus(false, '已断开，重连中...');
+});
+
+socket.on('connect_error', (err) => {
+  console.log('[Socket] Connection error:', err.message);
+  updateConnectionStatus(false, '连接失败，重试中...');
+});
+
+socket.on('reconnect', (attemptNumber) => {
+  console.log('[Socket] Reconnected after', attemptNumber, 'attempts');
+  updateConnectionStatus(true);
+});
+
+socket.on('reconnect_attempt', (attemptNumber) => {
+  console.log('[Socket] Reconnection attempt', attemptNumber);
+  updateConnectionStatus(false, `重连中 (${attemptNumber})...`);
+});
 
 // ===== 大厅 =====
 function createGame() {
+  if (!isConnected) {
+    showError('未连接到服务器，请等待...');
+    return;
+  }
   const name = document.getElementById('playerName').value.trim() || '玩家1';
   socket.emit('create_game', name);
 }
 
 function joinGame() {
+  if (!isConnected) {
+    showError('未连接到服务器，请等待...');
+    return;
+  }
   const name = document.getElementById('playerName').value.trim() || '玩家2';
   const roomCode = document.getElementById('roomCodeInput').value.trim().toUpperCase();
   if (!roomCode || roomCode.length < 4) {
     showError('请输入4位房间号');
     return;
   }
+  // Show joining feedback
+  const btn = document.getElementById('btnJoin');
+  btn.textContent = '⏳ 加入中...';
+  btn.disabled = true;
   socket.emit('join_game', { roomCode, playerName: name });
+
+  // Reset button after 5s in case of silent failure
+  setTimeout(() => {
+    if (document.getElementById('lobby').classList.contains('active')) {
+      btn.textContent = '🤝 加入房间';
+      btn.disabled = false;
+    }
+  }, 5000);
 }
 
 function copyRoomCode() {
@@ -30,6 +105,8 @@ function copyRoomCode() {
       fb.style.display = 'block';
       fb.textContent = '已复制到剪贴板！';
       setTimeout(() => { fb.style.display = 'none'; }, 2000);
+    }).catch(() => {
+      prompt('复制以下内容发给好友：', fullText);
     });
   } else {
     prompt('复制以下内容发给好友：', fullText);
@@ -44,20 +121,25 @@ socket.on('game_created', ({ roomCode, playerId }) => {
   document.getElementById('roomCodeDisplay').textContent = roomCode;
   document.getElementById('roomCodeReminder').textContent = roomCode;
   document.getElementById('gameLink').textContent = window.location.href.split('?')[0];
+  console.log('[Game] Room created:', roomCode);
 });
 
-socket.on('game_joined', () => {
-  // 等 game_state 到来后自动跳转
+socket.on('game_joined', ({ roomCode }) => {
+  console.log('[Game] Joined room:', roomCode);
+  // game_state will trigger transition
 });
 
 socket.on('game_started', () => {
-  // game_state 紧随其后
+  console.log('[Game] Game started!');
 });
 
 // ===== 游戏状态 =====
 socket.on('game_state', (state) => {
+  console.log('[Game] game_state received: round=' + state.round + ' phase=' + state.phase);
+
   // 只有游戏真正开始（回合>0）才切换到游戏界面
   if (state.phase === 'waiting' || state.round === 0) {
+    console.log('[Game] Ignoring game_state (game not started yet)');
     return;
   }
 
@@ -107,7 +189,14 @@ socket.on('game_over', (result) => {
 });
 
 socket.on('error_msg', (msg) => {
+  console.log('[Game] Error:', msg);
   showError(msg);
+  // Reset join button if on lobby
+  const btn = document.getElementById('btnJoin');
+  if (btn) {
+    btn.textContent = '🤝 加入房间';
+    btn.disabled = false;
+  }
 });
 
 socket.on('player_left', () => {
@@ -277,7 +366,6 @@ function renderShop() {
 function onBenchClick(index) {
   const unit = gameState.player.bench[index];
 
-  // 如果棋盘格子被选中了，点击备战席空位 = 把棋盘棋子移回备战席
   if (selectedBoardCell) {
     if (!unit) {
       socket.emit('return_to_bench', {
@@ -292,7 +380,6 @@ function onBenchClick(index) {
     return;
   }
 
-  // 双击 = 出售
   if (selectedBenchIndex === index) {
     if (unit) {
       socket.emit('sell_champion', { from: 'bench', index: index });
@@ -313,7 +400,6 @@ function onBenchClick(index) {
 function onBoardCellClick(row, col) {
   const unit = gameState.player.board[row][col];
 
-  // 备战席棋子已选中 -> 放到棋盘
   if (selectedBenchIndex !== null) {
     socket.emit('place_champion', {
       benchIndex: selectedBenchIndex,
@@ -325,10 +411,8 @@ function onBoardCellClick(row, col) {
     return;
   }
 
-  // 棋盘格子已选中 -> 移动/交换
   if (selectedBoardCell) {
     if (selectedBoardCell.row === row && selectedBoardCell.col === col) {
-      // 双击棋盘棋子 = 移回备战席
       socket.emit('return_to_bench', { boardRow: row, boardCol: col });
       selectedBoardCell = null;
       return;
@@ -344,7 +428,6 @@ function onBoardCellClick(row, col) {
     return;
   }
 
-  // 选中棋盘上的棋子
   if (unit) {
     selectedBoardCell = { row, col };
     selectedBenchIndex = null;
@@ -424,7 +507,7 @@ function showError(msg) {
   clearTimeout(toast._timeout);
   toast._timeout = setTimeout(() => {
     toast.style.display = 'none';
-  }, 2500);
+  }, 3000);
 }
 
 // 回车键支持

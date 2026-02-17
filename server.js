@@ -7,13 +7,18 @@ const GameEngine = require('./game/engine');
 const app = express();
 const server = http.createServer(app);
 const io = new Server(server, {
-  cors: { origin: '*' }
+  cors: { origin: '*' },
+  pingTimeout: 30000,
+  pingInterval: 10000,
+  transports: ['polling', 'websocket'],
+  allowUpgrades: true,
 });
 
 app.use(express.static(path.join(__dirname, 'public')));
 
 const games = new Map();
 const playerToGame = new Map();
+const disconnectTimers = new Map(); // grace period timers for disconnects
 
 function generateRoomCode() {
   const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
@@ -22,40 +27,76 @@ function generateRoomCode() {
   return code;
 }
 
+// Debug endpoint to check server state
+app.get('/api/status', (req, res) => {
+  const roomList = [];
+  for (const [code, engine] of games) {
+    roomList.push({
+      code,
+      players: engine.players.size,
+      phase: engine.phase,
+      round: engine.round,
+    });
+  }
+  res.json({
+    ok: true,
+    rooms: roomList,
+    totalConnections: io.engine.clientsCount,
+  });
+});
+
 io.on('connection', (socket) => {
-  console.log(`Player connected: ${socket.id}`);
+  console.log(`[连接] ${socket.id} (transport: ${socket.conn.transport.name})`);
+
+  socket.conn.on('upgrade', (transport) => {
+    console.log(`[升级] ${socket.id} -> ${transport.name}`);
+  });
 
   socket.on('create_game', (playerName) => {
     const roomCode = generateRoomCode();
     const engine = new GameEngine(roomCode);
-    engine.addPlayer(socket.id, playerName || 'Player 1');
+    engine.addPlayer(socket.id, playerName || '玩家1');
     games.set(roomCode, engine);
     playerToGame.set(socket.id, roomCode);
     socket.join(roomCode);
     socket.emit('game_created', { roomCode, playerId: socket.id });
-    // Don't send game_state yet - wait for opponent to join
-    console.log(`Game ${roomCode} created by ${playerName}`);
+    console.log(`[创建] 房间 ${roomCode} 由 "${playerName}" 创建 (${socket.id})`);
   });
 
   socket.on('join_game', ({ roomCode, playerName }) => {
-    roomCode = (roomCode || '').toUpperCase();
+    roomCode = (roomCode || '').toUpperCase().trim();
+    console.log(`[加入] "${playerName}" (${socket.id}) 尝试加入房间 ${roomCode}`);
+
     const engine = games.get(roomCode);
     if (!engine) {
-      socket.emit('error_msg', '房间不存在');
+      console.log(`[错误] 房间 ${roomCode} 不存在. 当前房间: [${[...games.keys()].join(', ')}]`);
+      socket.emit('error_msg', '房间不存在，请检查房间号');
       return;
     }
     if (engine.players.size >= 2) {
+      console.log(`[错误] 房间 ${roomCode} 已满 (${engine.players.size} 玩家)`);
       socket.emit('error_msg', '房间已满');
       return;
     }
-    engine.addPlayer(socket.id, playerName || 'Player 2');
+
+    // Cancel any pending disconnect cleanup for the room creator
+    for (const [sid, timer] of disconnectTimers) {
+      if (playerToGame.get(sid) === roomCode) {
+        clearTimeout(timer);
+        disconnectTimers.delete(sid);
+        console.log(`[恢复] 取消房间 ${roomCode} 的清理计时器`);
+      }
+    }
+
+    engine.addPlayer(socket.id, playerName || '玩家2');
     playerToGame.set(socket.id, roomCode);
     socket.join(roomCode);
     socket.emit('game_joined', { roomCode, playerId: socket.id });
+    console.log(`[加入] "${playerName}" 成功加入房间 ${roomCode} (玩家数: ${engine.players.size})`);
 
     if (engine.players.size === 2) {
       engine.startGame();
-      // Notify both players the game is starting
+      console.log(`[开始] 房间 ${roomCode} 游戏开始! 回合 ${engine.round}`);
       io.to(roomCode).emit('game_started');
       for (const [pid] of engine.players) {
         io.to(pid).emit('game_state', engine.getStateForPlayer(pid));
@@ -167,20 +208,32 @@ io.on('connection', (socket) => {
     }
   });
 
-  socket.on('disconnect', () => {
+  socket.on('disconnect', (reason) => {
+    console.log(`[断开] ${socket.id} 原因: ${reason}`);
     const roomCode = playerToGame.get(socket.id);
     if (roomCode) {
       const engine = games.get(roomCode);
       if (engine) {
-        engine.removePlayer(socket.id);
-        io.to(roomCode).emit('player_left', socket.id);
-        if (engine.players.size === 0) {
-          games.delete(roomCode);
-        }
+        // Grace period: wait 30s before actually removing the player/room
+        // This handles mobile connection drops and tunnel hiccups
+        console.log(`[等待] 30秒后清理 ${socket.id} (房间 ${roomCode})`);
+        const timer = setTimeout(() => {
+          disconnectTimers.delete(socket.id);
+          const eng = games.get(roomCode);
+          if (eng) {
+            eng.removePlayer(socket.id);
+            io.to(roomCode).emit('player_left', socket.id);
+            console.log(`[清理] 移除玩家 ${socket.id} (房间 ${roomCode}, 剩余: ${eng.players.size})`);
+            if (eng.players.size === 0) {
+              games.delete(roomCode);
+              console.log(`[删除] 房间 ${roomCode} 已删除（无玩家）`);
+            }
+          }
+          playerToGame.delete(socket.id);
+        }, 30000);
+        disconnectTimers.set(socket.id, timer);
       }
-      playerToGame.delete(socket.id);
     }
-    console.log(`Player disconnected: ${socket.id}`);
   });
 });
 
