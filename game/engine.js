@@ -601,6 +601,9 @@ class GameEngine {
     const damage = Math.max(2, this.round + result.winnerUnitsLeft);
     loser.hp = Math.max(0, loser.hp - damage);
 
+    // 获胜奖励+1金币
+    winner.gold += 1;
+
     winner.lastResult = 'win';
     loser.lastResult = 'loss';
     if (winner.streak > 0) winner.streak++; else winner.streak = 1;
