@@ -41,11 +41,11 @@ io.on('connection', (socket) => {
     roomCode = (roomCode || '').toUpperCase();
     const engine = games.get(roomCode);
     if (!engine) {
-      socket.emit('error_msg', 'Game not found');
+      socket.emit('error_msg', '房间不存在');
       return;
     }
     if (engine.players.size >= 2) {
-      socket.emit('error_msg', 'Game is full');
+      socket.emit('error_msg', '房间已满');
       return;
     }
     engine.addPlayer(socket.id, playerName || 'Player 2');
@@ -236,7 +236,7 @@ setInterval(() => {
 
 const PORT = process.env.PORT || 3000;
 server.listen(PORT, '0.0.0.0', () => {
-  console.log(`\n=== 金铲铲 Auto-Battler ===`);
-  console.log(`Server running on port ${PORT}`);
-  console.log(`Open http://localhost:${PORT} in your browser\n`);
+  console.log(`\n=== 金铲铲之战 - 自走棋 ===`);
+  console.log(`服务器运行在端口 ${PORT}`);
+  console.log(`在浏览器打开 http://localhost:${PORT}\n`);
 });

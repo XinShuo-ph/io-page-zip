@@ -5,17 +5,17 @@ let selectedBenchIndex = null;
 let selectedBoardCell = null;
 let myRoomCode = null;
 
-// ===== LOBBY =====
+// ===== 大厅 =====
 function createGame() {
-  const name = document.getElementById('playerName').value.trim() || 'Player 1';
+  const name = document.getElementById('playerName').value.trim() || '玩家1';
   socket.emit('create_game', name);
 }
 
 function joinGame() {
-  const name = document.getElementById('playerName').value.trim() || 'Player 2';
+  const name = document.getElementById('playerName').value.trim() || '玩家2';
   const roomCode = document.getElementById('roomCodeInput').value.trim().toUpperCase();
   if (!roomCode || roomCode.length < 4) {
-    showError('Enter a valid 4-letter room code');
+    showError('请输入4位房间号');
     return;
   }
   socket.emit('join_game', { roomCode, playerName: name });
@@ -23,20 +23,20 @@ function joinGame() {
 
 function copyRoomCode() {
   if (!myRoomCode) return;
-  const fullText = window.location.href.split('?')[0] + ' - Room Code: ' + myRoomCode;
+  const fullText = '金铲铲之战 - 房间号: ' + myRoomCode + ' 链接: ' + window.location.href.split('?')[0];
   if (navigator.clipboard) {
     navigator.clipboard.writeText(fullText).then(() => {
       const fb = document.getElementById('copyFeedback');
       fb.style.display = 'block';
-      fb.textContent = 'Copied to clipboard!';
+      fb.textContent = '已复制到剪贴板！';
       setTimeout(() => { fb.style.display = 'none'; }, 2000);
     });
   } else {
-    prompt('Copy this and send to your friend:', fullText);
+    prompt('复制以下内容发给好友：', fullText);
   }
 }
 
-// When game is created, show waiting room with room code (stay on lobby screen!)
+// 创建房间后，显示等待界面（留在大厅页面）
 socket.on('game_created', ({ roomCode, playerId }) => {
   myRoomCode = roomCode;
   document.getElementById('lobbyMenu').style.display = 'none';
@@ -46,27 +46,24 @@ socket.on('game_created', ({ roomCode, playerId }) => {
   document.getElementById('gameLink').textContent = window.location.href.split('?')[0];
 });
 
-// When joined a game, show a brief message (game_state will trigger transition)
 socket.on('game_joined', () => {
-  // Transition happens when game_started + game_state arrives
+  // 等 game_state 到来后自动跳转
 });
 
-// Game started signal: now we know it's time to switch to game screen
 socket.on('game_started', () => {
-  // Transition will happen when game_state arrives right after this
+  // game_state 紧随其后
 });
 
-// ===== GAME STATE =====
+// ===== 游戏状态 =====
 socket.on('game_state', (state) => {
-  // Only switch to game screen if the game has actually started (round > 0)
+  // 只有游戏真正开始（回合>0）才切换到游戏界面
   if (state.phase === 'waiting' || state.round === 0) {
-    // Game hasn't started yet, stay on lobby
     return;
   }
 
   gameState = state;
 
-  // Switch to game screen
+  // 切换到游戏界面
   document.getElementById('lobby').classList.remove('active');
   document.getElementById('lobby').style.display = 'none';
   const gameEl = document.getElementById('game');
@@ -89,7 +86,7 @@ socket.on('timer_update', (t) => {
   if (gameState) {
     gameState.timer = t;
     const el = document.getElementById('timerDisplay');
-    el.textContent = t + 's';
+    el.textContent = t + '秒';
     el.style.color = t <= 5 ? '#ef4444' : '';
   }
 });
@@ -102,11 +99,11 @@ socket.on('game_over', (result) => {
   const overlay = document.getElementById('gameOverOverlay');
   overlay.style.display = 'flex';
   const isWinner = result.winner === gameState.playerId;
-  document.getElementById('gameOverTitle').textContent = isWinner ? '🏆 Victory!' : '💀 Defeat';
+  document.getElementById('gameOverTitle').textContent = isWinner ? '🏆 大吉大利！' : '💀 落败了...';
   document.getElementById('gameOverTitle').className = isWinner ? 'victory' : 'defeat';
   document.getElementById('gameOverMsg').textContent = isWinner
-    ? `You defeated ${result.loserName}!`
-    : `${result.winnerName} won the battle.`;
+    ? `你击败了 ${result.loserName}！`
+    : `${result.winnerName} 获得了胜利`;
 });
 
 socket.on('error_msg', (msg) => {
@@ -114,10 +111,10 @@ socket.on('error_msg', (msg) => {
 });
 
 socket.on('player_left', () => {
-  showError('Opponent disconnected');
+  showError('对手已断开连接');
 });
 
-// ===== RENDER =====
+// ===== 渲染 =====
 function renderGame() {
   if (!gameState) return;
   renderTopBar();
@@ -134,28 +131,28 @@ function renderTopBar() {
 
   document.getElementById('myName').textContent = p.name;
   document.getElementById('myHp').textContent = p.hp;
-  document.getElementById('roundDisplay').textContent = `Round ${gameState.round}`;
+  document.getElementById('roundDisplay').textContent = `第${gameState.round}回合`;
 
   const phaseEl = document.getElementById('phaseDisplay');
   if (gameState.phase === 'preparation') {
-    phaseEl.textContent = '🛠 Prep';
+    phaseEl.textContent = '🛠 备战中';
     phaseEl.style.borderColor = 'var(--gold-dark)';
   } else {
-    phaseEl.textContent = '⚔️ Battle';
+    phaseEl.textContent = '⚔️ 战斗中';
     phaseEl.style.borderColor = 'var(--red)';
   }
 
-  document.getElementById('timerDisplay').textContent = gameState.timer + 's';
+  document.getElementById('timerDisplay').textContent = gameState.timer + '秒';
   document.getElementById('goldDisplay').textContent = p.gold;
   document.getElementById('levelDisplay').textContent = p.level;
   document.getElementById('xpDisplay').textContent = `${p.xp}/${p.xpToLevel}`;
   document.getElementById('unitCount').textContent = `${p.boardCount}/${p.maxUnits}`;
 
   if (p.streak > 0) {
-    document.getElementById('streakDisplay').textContent = `🔥${p.streak}W`;
+    document.getElementById('streakDisplay').textContent = `🔥${p.streak}连胜`;
     document.getElementById('streakDisplay').style.color = '#4ade80';
   } else if (p.streak < 0) {
-    document.getElementById('streakDisplay').textContent = `💀${Math.abs(p.streak)}L`;
+    document.getElementById('streakDisplay').textContent = `💀${Math.abs(p.streak)}连败`;
     document.getElementById('streakDisplay').style.color = '#ef4444';
   } else {
     document.getElementById('streakDisplay').textContent = '';
@@ -276,11 +273,11 @@ function renderShop() {
   container.innerHTML = html;
 }
 
-// ===== INTERACTIONS =====
+// ===== 交互操作 =====
 function onBenchClick(index) {
   const unit = gameState.player.bench[index];
 
-  // If board cell was selected, return it to this bench slot
+  // 如果棋盘格子被选中了，点击备战席空位 = 把棋盘棋子移回备战席
   if (selectedBoardCell) {
     if (!unit) {
       socket.emit('return_to_bench', {
@@ -295,9 +292,8 @@ function onBenchClick(index) {
     return;
   }
 
-  // Toggle bench selection
+  // 双击 = 出售
   if (selectedBenchIndex === index) {
-    // Double-tap = sell
     if (unit) {
       socket.emit('sell_champion', { from: 'bench', index: index });
     }
@@ -317,7 +313,7 @@ function onBenchClick(index) {
 function onBoardCellClick(row, col) {
   const unit = gameState.player.board[row][col];
 
-  // If a bench unit is selected, place it on the board
+  // 备战席棋子已选中 -> 放到棋盘
   if (selectedBenchIndex !== null) {
     socket.emit('place_champion', {
       benchIndex: selectedBenchIndex,
@@ -329,10 +325,10 @@ function onBoardCellClick(row, col) {
     return;
   }
 
-  // If a board cell is selected, move/swap
+  // 棋盘格子已选中 -> 移动/交换
   if (selectedBoardCell) {
     if (selectedBoardCell.row === row && selectedBoardCell.col === col) {
-      // Double-tap on board: return to bench
+      // 双击棋盘棋子 = 移回备战席
       socket.emit('return_to_bench', { boardRow: row, boardCol: col });
       selectedBoardCell = null;
       return;
@@ -348,7 +344,7 @@ function onBoardCellClick(row, col) {
     return;
   }
 
-  // Select board cell with a unit
+  // 选中棋盘上的棋子
   if (unit) {
     selectedBoardCell = { row, col };
     selectedBenchIndex = null;
@@ -369,7 +365,7 @@ function buyXP() {
   socket.emit('buy_xp');
 }
 
-// ===== BATTLE =====
+// ===== 战斗 =====
 function showBattle(log) {
   const overlay = document.getElementById('battleOverlay');
   const logContainer = document.getElementById('battleLog');
@@ -395,22 +391,21 @@ function showBattle(log) {
     switch (entry.type) {
       case 'attack':
         div.className += ' log-attack';
-        div.textContent = `${entry.attacker.emoji} ${entry.attacker.name} → ${entry.target.emoji} ${entry.target.name} -${entry.damage} (${entry.targetHp}hp)`;
+        div.textContent = `${entry.attacker.emoji} ${entry.attacker.name} → ${entry.target.emoji} ${entry.target.name} -${entry.damage} (剩${entry.targetHp}血)`;
         break;
       case 'crit':
         div.className += ' log-crit';
-        div.textContent = `💥 CRIT! ${entry.attacker.emoji} ${entry.attacker.name} → ${entry.target.emoji} -${entry.damage}!`;
+        div.textContent = `💥 暴击！${entry.attacker.emoji} ${entry.attacker.name} → ${entry.target.emoji} -${entry.damage}！`;
         break;
       case 'ability':
         div.className += ' log-ability';
-        div.textContent = `✨ ${entry.attacker.emoji} ${entry.attacker.ability}! → ${entry.target.emoji} -${entry.damage}`;
+        div.textContent = `✨ ${entry.attacker.emoji} 释放【${entry.attacker.ability}】→ ${entry.target.emoji} -${entry.damage}`;
         break;
       case 'death':
         div.className += ' log-death';
-        div.textContent = `☠️ ${entry.unit.emoji} ${entry.unit.name} defeated!`;
+        div.textContent = `☠️ ${entry.unit.emoji} ${entry.unit.name} 阵亡！`;
         break;
       case 'move':
-        // Skip move logs to keep it readable
         i++;
         return;
     }
@@ -421,7 +416,7 @@ function showBattle(log) {
   }, speed);
 }
 
-// ===== ERROR =====
+// ===== 错误提示 =====
 function showError(msg) {
   const toast = document.getElementById('errorToast');
   toast.textContent = msg;
@@ -432,7 +427,7 @@ function showError(msg) {
   }, 2500);
 }
 
-// Enter key support
+// 回车键支持
 document.addEventListener('keydown', (e) => {
   if (e.key === 'Enter') {
     if (document.getElementById('lobby').classList.contains('active')) {

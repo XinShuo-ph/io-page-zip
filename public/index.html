@@ -1,154 +1,154 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="zh-CN">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, maximum-scale=1.0">
-  <title>金铲铲 Auto-Battler</title>
+  <title>金铲铲之战 - 自走棋</title>
   <link rel="stylesheet" href="style.css">
   <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>⚔️</text></svg>">
 </head>
 <body>
-  <!-- ===== LOBBY SCREEN ===== -->
+  <!-- ===== 大厅界面 ===== -->
   <div id="lobby" class="screen active">
     <div class="lobby-container">
-      <h1 class="game-title">⚔️ 金铲铲<br><span class="subtitle">Auto-Battler</span></h1>
-      <p class="description">A 2-player auto-chess battle game inspired by TFT / 金铲铲之战</p>
+      <h1 class="game-title">⚔️ 金铲铲之战<br><span class="subtitle">自走棋对战</span></h1>
+      <p class="description">招募棋子、搭配羁绊、自动战斗！双人对战小游戏</p>
 
-      <!-- Main Menu -->
+      <!-- 主菜单 -->
       <div id="lobbyMenu" class="lobby-form">
-        <input type="text" id="playerName" placeholder="Enter your name" maxlength="12" class="input-field">
+        <input type="text" id="playerName" placeholder="输入你的昵称" maxlength="12" class="input-field">
 
         <button id="btnCreate" class="btn btn-primary" onclick="createGame()">
-          🎮 Create New Game
+          🎮 创建房间
         </button>
 
-        <div class="divider"><span>or join a friend</span></div>
+        <div class="divider"><span>或者加入好友</span></div>
 
-        <input type="text" id="roomCodeInput" placeholder="Enter 4-letter Room Code" maxlength="4" class="input-field" style="text-transform:uppercase">
+        <input type="text" id="roomCodeInput" placeholder="输入4位房间号" maxlength="4" class="input-field" style="text-transform:uppercase">
         <button id="btnJoin" class="btn btn-secondary" onclick="joinGame()">
-          🤝 Join Game
+          🤝 加入房间
         </button>
 
-        <!-- How to Play -->
+        <!-- 玩法说明 -->
         <div class="how-to-play">
-          <h3>📖 How to Play</h3>
+          <h3>📖 玩法说明</h3>
           <ol>
-            <li><strong>Create</strong> a game and share the Room Code with a friend</li>
-            <li><strong>Buy</strong> champions from the shop using gold</li>
-            <li><strong>Place</strong> them from bench onto your board</li>
-            <li><strong>Match traits</strong> (e.g. 2 Warriors) for bonus stats</li>
-            <li><strong>Battle</strong> happens automatically every 30 seconds</li>
-            <li><strong>Win</strong> by reducing your opponent's HP to 0!</li>
+            <li><strong>创建房间</strong>，把房间号分享给好友</li>
+            <li>用金币从<strong>商店购买</strong>棋子</li>
+            <li>把棋子从备战席<strong>拖到棋盘</strong>上</li>
+            <li>搭配<strong>羁绊</strong>（如2个战士）获得属性加成</li>
+            <li>每30秒自动<strong>战斗</strong>，棋子会自己打</li>
+            <li>把对手<strong>血量打到0</strong>就赢了！</li>
           </ol>
         </div>
       </div>
 
-      <!-- Waiting Room (shown after creating game) -->
+      <!-- 等待房间（创建后显示） -->
       <div id="waitingRoom" style="display:none">
         <div class="waiting-card">
           <div class="spinner"></div>
-          <p class="waiting-label">Your Room Code:</p>
+          <p class="waiting-label">你的房间号：</p>
           <div class="room-code-display">
             <span id="roomCodeDisplay">----</span>
           </div>
           <button class="btn btn-copy" onclick="copyRoomCode()">
-            📋 Copy Room Code
+            📋 复制房间号
           </button>
-          <p id="copyFeedback" class="copy-feedback" style="display:none">Copied!</p>
+          <p id="copyFeedback" class="copy-feedback" style="display:none">已复制！</p>
 
           <div class="invite-instructions">
-            <p><strong>How to invite your opponent:</strong></p>
+            <p><strong>如何邀请对手：</strong></p>
             <ol>
-              <li>Send them this link: <span class="link-text" id="gameLink"></span></li>
-              <li>They open it on their phone/browser</li>
-              <li>They enter the room code <strong id="roomCodeReminder">----</strong> and tap "Join Game"</li>
+              <li>把这个链接发给好友：<span class="link-text" id="gameLink"></span></li>
+              <li>好友在手机/电脑浏览器打开链接</li>
+              <li>输入房间号 <strong id="roomCodeReminder">----</strong>，点"加入房间"</li>
             </ol>
           </div>
 
-          <p class="waiting-text">⏳ Waiting for opponent to join...</p>
-          <button class="btn btn-secondary btn-cancel" onclick="location.reload()">Cancel</button>
+          <p class="waiting-text">⏳ 等待对手加入中...</p>
+          <button class="btn btn-secondary btn-cancel" onclick="location.reload()">取消</button>
         </div>
       </div>
     </div>
   </div>
 
-  <!-- ===== GAME SCREEN ===== -->
+  <!-- ===== 游戏界面 ===== -->
   <div id="game" class="screen">
-    <!-- Top Bar -->
+    <!-- 顶部信息栏 -->
     <div class="top-bar">
       <div class="player-info">
-        <span class="player-name" id="myName">You</span>
+        <span class="player-name" id="myName">我</span>
         <span class="hp-bar">
           ❤️ <span id="myHp">100</span>
         </span>
       </div>
       <div class="round-info">
-        <span id="roundDisplay">Round 1</span>
-        <span id="phaseDisplay" class="phase-badge">Preparation</span>
-        <span id="timerDisplay" class="timer">30s</span>
+        <span id="roundDisplay">第1回合</span>
+        <span id="phaseDisplay" class="phase-badge">备战阶段</span>
+        <span id="timerDisplay" class="timer">30秒</span>
       </div>
       <div class="player-info opponent-info">
-        <span class="player-name" id="oppName">Opponent</span>
+        <span class="player-name" id="oppName">对手</span>
         <span class="hp-bar enemy">
           ❤️ <span id="oppHp">100</span>
         </span>
       </div>
     </div>
 
-    <!-- Resource Bar -->
+    <!-- 资源栏 -->
     <div class="resource-bar">
       <span class="gold">💰 <span id="goldDisplay">0</span></span>
-      <span class="level">⭐ Lv.<span id="levelDisplay">1</span></span>
-      <span class="xp">XP: <span id="xpDisplay">0/2</span></span>
+      <span class="level">⭐ 等级<span id="levelDisplay">1</span></span>
+      <span class="xp">经验: <span id="xpDisplay">0/2</span></span>
       <span class="units">👥 <span id="unitCount">0/1</span></span>
       <span class="streak" id="streakDisplay"></span>
     </div>
 
-    <!-- Active Traits -->
+    <!-- 激活羁绊 -->
     <div class="traits-bar" id="traitsBar"></div>
 
-    <!-- Opponent Board (read-only, small) -->
-    <div class="section-label">⚔️ Opponent's Board</div>
+    <!-- 对手棋盘（只读，缩小） -->
+    <div class="section-label">⚔️ 对手的棋盘</div>
     <div class="board-container opponent-board" id="opponentBoard"></div>
 
-    <!-- Player Board -->
-    <div class="section-label">🏰 Your Board <span class="hint">(tap bench unit, then tap a board cell to place)</span></div>
+    <!-- 我的棋盘 -->
+    <div class="section-label">🏰 我的棋盘 <span class="hint">（先点备战席棋子，再点棋盘格子放置）</span></div>
     <div class="board-container player-board" id="playerBoard"></div>
 
-    <!-- Bench -->
-    <div class="section-label">💺 Bench <span class="hint">(tap to select, tap board to place, double-tap to sell)</span></div>
+    <!-- 备战席 -->
+    <div class="section-label">💺 备战席 <span class="hint">（点击选中，双击出售）</span></div>
     <div class="bench-container" id="benchContainer"></div>
 
-    <!-- Shop -->
+    <!-- 商店 -->
     <div class="shop-container">
       <div class="shop-header">
-        <span>🏪 Shop</span>
+        <span>🏪 商店</span>
         <div class="shop-buttons">
-          <button class="btn btn-sm" onclick="buyXP()">📈 XP (4💰)</button>
-          <button class="btn btn-sm" onclick="refreshShop()">🔄 Reroll (2💰)</button>
+          <button class="btn btn-sm" onclick="buyXP()">📈 买经验(4💰)</button>
+          <button class="btn btn-sm" onclick="refreshShop()">🔄 刷新(2💰)</button>
         </div>
       </div>
       <div class="shop-cards" id="shopCards"></div>
     </div>
 
-    <!-- Battle Log Overlay -->
+    <!-- 战斗日志浮层 -->
     <div id="battleOverlay" class="battle-overlay" style="display:none">
       <div class="battle-content">
-        <h2>⚔️ Battle!</h2>
+        <h2>⚔️ 战斗中！</h2>
         <div id="battleLog" class="battle-log"></div>
       </div>
     </div>
 
-    <!-- Game Over Overlay -->
+    <!-- 游戏结束浮层 -->
     <div id="gameOverOverlay" class="game-over-overlay" style="display:none">
       <div class="game-over-content">
-        <h1 id="gameOverTitle">Victory!</h1>
+        <h1 id="gameOverTitle">胜利！</h1>
         <p id="gameOverMsg"></p>
-        <button class="btn btn-primary" onclick="location.reload()">Play Again</button>
+        <button class="btn btn-primary" onclick="location.reload()">再来一局</button>
       </div>
     </div>
 
-    <!-- Error Toast -->
+    <!-- 错误提示 -->
     <div id="errorToast" class="error-toast" style="display:none"></div>
   </div>
 

@@ -110,15 +110,15 @@ class GameEngine {
 
   buyChampion(playerId, shopIndex) {
     const player = this.players.get(playerId);
-    if (!player || this.phase !== 'preparation') return { success: false, message: 'Not in preparation phase' };
+    if (!player || this.phase !== 'preparation') return { success: false, message: '当前不在备战阶段' };
 
     const champ = player.shop[shopIndex];
-    if (!champ) return { success: false, message: 'Invalid shop slot' };
-    if (player.gold < champ.cost) return { success: false, message: 'Not enough gold' };
+    if (!champ) return { success: false, message: '无效的商店位置' };
+    if (player.gold < champ.cost) return { success: false, message: '金币不足' };
 
     // Find empty bench slot
     const benchIdx = player.bench.findIndex(s => s === null);
-    if (benchIdx === -1) return { success: false, message: 'Bench is full' };
+    if (benchIdx === -1) return { success: false, message: '备战席已满' };
 
     player.gold -= champ.cost;
     player.bench[benchIdx] = { ...champ };
@@ -193,15 +193,15 @@ class GameEngine {
 
   sellChampion(playerId, from, index) {
     const player = this.players.get(playerId);
-    if (!player) return { success: false, message: 'Player not found' };
+    if (!player) return { success: false, message: '玩家未找到' };
 
     let champ;
     if (from === 'bench') {
       champ = player.bench[index];
-      if (!champ) return { success: false, message: 'No champion there' };
+      if (!champ) return { success: false, message: '该位置没有棋子' };
       player.bench[index] = null;
     } else {
-      return { success: false, message: 'Invalid source' };
+      return { success: false, message: '无效操作' };
     }
 
     // Refund gold based on cost and stars
@@ -222,14 +222,14 @@ class GameEngine {
 
   placeChampion(playerId, benchIndex, boardRow, boardCol) {
     const player = this.players.get(playerId);
-    if (!player) return { success: false, message: 'Player not found' };
-    if (this.phase !== 'preparation') return { success: false, message: 'Not in preparation phase' };
+    if (!player) return { success: false, message: '玩家未找到' };
+    if (this.phase !== 'preparation') return { success: false, message: '当前不在备战阶段' };
 
     if (boardRow < 0 || boardRow > 3 || boardCol < 0 || boardCol > 6)
-      return { success: false, message: 'Invalid board position' };
+      return { success: false, message: '无效的棋盘位置' };
 
     const champ = player.bench[benchIndex];
-    if (!champ) return { success: false, message: 'No champion on bench' };
+    if (!champ) return { success: false, message: '备战席上没有棋子' };
 
     // Count current board champions
     const boardCount = this.getBoardChampionCount(player);
@@ -243,7 +243,7 @@ class GameEngine {
     }
 
     if (boardCount >= player.level) {
-      return { success: false, message: `Max ${player.level} champions on board (level ${player.level})` };
+      return { success: false, message: `棋盘已满，等级${player.level}最多上${player.level}个棋子` };
     }
 
     player.board[boardRow][boardCol] = champ;
@@ -254,14 +254,14 @@ class GameEngine {
 
   moveChampion(playerId, fromRow, fromCol, toRow, toCol) {
     const player = this.players.get(playerId);
-    if (!player) return { success: false, message: 'Player not found' };
-    if (this.phase !== 'preparation') return { success: false, message: 'Not in preparation phase' };
+    if (!player) return { success: false, message: '玩家未找到' };
+    if (this.phase !== 'preparation') return { success: false, message: '当前不在备战阶段' };
 
     if (toRow < 0 || toRow > 3 || toCol < 0 || toCol > 6)
-      return { success: false, message: 'Invalid position' };
+      return { success: false, message: '无效位置' };
 
     const champ = player.board[fromRow][fromCol];
-    if (!champ) return { success: false, message: 'No champion at source' };
+    if (!champ) return { success: false, message: '该位置没有棋子' };
 
     // Swap
     const target = player.board[toRow][toCol];
@@ -273,13 +273,13 @@ class GameEngine {
 
   returnToBench(playerId, boardRow, boardCol) {
     const player = this.players.get(playerId);
-    if (!player) return { success: false, message: 'Player not found' };
+    if (!player) return { success: false, message: '玩家未找到' };
 
     const champ = player.board[boardRow][boardCol];
-    if (!champ) return { success: false, message: 'No champion there' };
+    if (!champ) return { success: false, message: '该位置没有棋子' };
 
     const benchIdx = player.bench.findIndex(s => s === null);
-    if (benchIdx === -1) return { success: false, message: 'Bench is full' };
+    if (benchIdx === -1) return { success: false, message: '备战席已满' };
 
     player.bench[benchIdx] = champ;
     player.board[boardRow][boardCol] = null;
@@ -289,8 +289,8 @@ class GameEngine {
 
   refreshShop(playerId) {
     const player = this.players.get(playerId);
-    if (!player) return { success: false, message: 'Player not found' };
-    if (player.gold < 2) return { success: false, message: 'Need 2 gold to refresh' };
+    if (!player) return { success: false, message: '玩家未找到' };
+    if (player.gold < 2) return { success: false, message: '刷新需要2金币' };
 
     player.gold -= 2;
     this.rollShop(player);
@@ -299,9 +299,9 @@ class GameEngine {
 
   buyXP(playerId) {
     const player = this.players.get(playerId);
-    if (!player) return { success: false, message: 'Player not found' };
-    if (player.gold < 4) return { success: false, message: 'Need 4 gold to buy XP' };
-    if (player.level >= 7) return { success: false, message: 'Max level reached' };
+    if (!player) return { success: false, message: '玩家未找到' };
+    if (player.gold < 4) return { success: false, message: '买经验需要4金币' };
+    if (player.level >= 7) return { success: false, message: '已达到最高等级' };
 
     player.gold -= 4;
     player.xp += 4;
