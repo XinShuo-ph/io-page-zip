@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, maximum-scale=1.0">
+  <title>金铲铲 Auto-Battler</title>
+  <link rel="stylesheet" href="style.css">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>⚔️</text></svg>">
+</head>
+<body>
+  <!-- Lobby Screen -->
+  <div id="lobby" class="screen active">
+    <div class="lobby-container">
+      <h1 class="game-title">⚔️ 金铲铲<br><span class="subtitle">Auto-Battler</span></h1>
+      <p class="description">Recruit champions, build synergies, battle automatically!</p>
+
+      <div class="lobby-form">
+        <input type="text" id="playerName" placeholder="Your Name" maxlength="12" class="input-field">
+
+        <button id="btnCreate" class="btn btn-primary" onclick="createGame()">
+          🎮 Create Game
+        </button>
+
+        <div class="divider"><span>or</span></div>
+
+        <input type="text" id="roomCodeInput" placeholder="Room Code" maxlength="4" class="input-field" style="text-transform:uppercase">
+        <button id="btnJoin" class="btn btn-secondary" onclick="joinGame()">
+          🤝 Join Game
+        </button>
+      </div>
+
+      <div id="waitingMsg" class="waiting-msg" style="display:none">
+        <div class="spinner"></div>
+        <p>Room: <strong id="roomCodeDisplay"></strong></p>
+        <p>Share this code with your opponent!</p>
+        <p class="waiting-text">Waiting for player 2...</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- Game Screen -->
+  <div id="game" class="screen">
+    <!-- Top Bar -->
+    <div class="top-bar">
+      <div class="player-info">
+        <span class="player-name" id="myName">You</span>
+        <span class="hp-bar">
+          ❤️ <span id="myHp">100</span>
+        </span>
+      </div>
+      <div class="round-info">
+        <span id="roundDisplay">Round 1</span>
+        <span id="phaseDisplay" class="phase-badge">Preparation</span>
+        <span id="timerDisplay" class="timer">30s</span>
+      </div>
+      <div class="player-info opponent-info">
+        <span class="player-name" id="oppName">Opponent</span>
+        <span class="hp-bar enemy">
+          ❤️ <span id="oppHp">100</span>
+        </span>
+      </div>
+    </div>
+
+    <!-- Resource Bar -->
+    <div class="resource-bar">
+      <span class="gold">💰 <span id="goldDisplay">0</span></span>
+      <span class="level">⭐ Lv.<span id="levelDisplay">1</span></span>
+      <span class="xp">XP: <span id="xpDisplay">0/2</span></span>
+      <span class="units">👥 <span id="unitCount">0/1</span></span>
+      <span class="streak" id="streakDisplay"></span>
+    </div>
+
+    <!-- Active Traits -->
+    <div class="traits-bar" id="traitsBar"></div>
+
+    <!-- Opponent Board (read-only, small) -->
+    <div class="section-label">Opponent's Board</div>
+    <div class="board-container opponent-board" id="opponentBoard"></div>
+
+    <!-- Player Board -->
+    <div class="section-label">Your Board <span class="hint">(tap bench unit, then tap board cell)</span></div>
+    <div class="board-container player-board" id="playerBoard"></div>
+
+    <!-- Bench -->
+    <div class="section-label">Bench <span class="hint">(tap to select/sell)</span></div>
+    <div class="bench-container" id="benchContainer"></div>
+
+    <!-- Shop -->
+    <div class="shop-container">
+      <div class="shop-header">
+        <span>🏪 Shop</span>
+        <div class="shop-buttons">
+          <button class="btn btn-sm" onclick="buyXP()">📈 Buy XP (4g)</button>
+          <button class="btn btn-sm" onclick="refreshShop()">🔄 Refresh (2g)</button>
+        </div>
+      </div>
+      <div class="shop-cards" id="shopCards"></div>
+    </div>
+
+    <!-- Battle Log Overlay -->
+    <div id="battleOverlay" class="battle-overlay" style="display:none">
+      <div class="battle-content">
+        <h2>⚔️ Battle!</h2>
+        <div id="battleLog" class="battle-log"></div>
+      </div>
+    </div>
+
+    <!-- Game Over Overlay -->
+    <div id="gameOverOverlay" class="game-over-overlay" style="display:none">
+      <div class="game-over-content">
+        <h1 id="gameOverTitle">Victory!</h1>
+        <p id="gameOverMsg"></p>
+        <button class="btn btn-primary" onclick="location.reload()">Play Again</button>
+      </div>
+    </div>
+
+    <!-- Error Toast -->
+    <div id="errorToast" class="error-toast" style="display:none"></div>
+  </div>
+
+  <script src="/socket.io/socket.io.js"></script>
+  <script src="game.js"></script>
+</body>
+</html>
