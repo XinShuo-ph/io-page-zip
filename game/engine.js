@@ -3,7 +3,8 @@ const { TRAITS, CHAMPION_POOL, POOL_SIZES, SHOP_ODDS, STAR_MULTIPLIERS } = requi
 class GameEngine {
   constructor(roomCode) {
     this.roomCode = roomCode;
-    this.players = new Map();
+    this.players = new Map();       // socketId -> playerData
+    this.playerSlots = new Map();   // slotIndex (0|1) -> { socketId, name, connected }
     this.phase = 'waiting'; // waiting, preparation, battle
     this.round = 0;
     this.phaseTimer = 30;
@@ -31,16 +32,19 @@ class GameEngine {
   }
 
   addPlayer(id, name) {
+    const slotIndex = this.playerSlots.size;
+    this.playerSlots.set(slotIndex, { socketId: id, name, connected: true });
     this.players.set(id, {
       id,
       name,
+      slotIndex,
       hp: 100,
       gold: 0,
       level: 1,
       xp: 0,
       xpToLevel: 2,
-      bench: Array(9).fill(null), // 9 bench slots
-      board: this.createEmptyBoard(), // 4x7 board (4 rows, 7 cols)
+      bench: Array(9).fill(null),
+      board: this.createEmptyBoard(),
       shop: [],
       ready: false,
       streak: 0,
@@ -56,8 +60,76 @@ class GameEngine {
     return board;
   }
 
+  // Find a player's slot by name (for rejoin)
+  findSlotByName(name) {
+    for (const [idx, slot] of this.playerSlots) {
+      if (slot.name === name) return idx;
+    }
+    return -1;
+  }
+
+  // Rejoin: replace old socketId with new one, preserve all game state
+  rejoinPlayer(oldSocketId, newSocketId) {
+    const playerData = this.players.get(oldSocketId);
+    if (!playerData) return false;
+
+    // Move data to new key
+    this.players.delete(oldSocketId);
+    playerData.id = newSocketId;
+    this.players.set(newSocketId, playerData);
+
+    // Update slot
+    for (const [idx, slot] of this.playerSlots) {
+      if (slot.socketId === oldSocketId) {
+        slot.socketId = newSocketId;
+        slot.connected = true;
+        break;
+      }
+    }
+    return true;
+  }
+
+  markDisconnected(socketId) {
+    for (const [idx, slot] of this.playerSlots) {
+      if (slot.socketId === socketId) {
+        slot.connected = false;
+        break;
+      }
+    }
+  }
+
+  markConnected(socketId) {
+    for (const [idx, slot] of this.playerSlots) {
+      if (slot.socketId === socketId) {
+        slot.connected = true;
+        break;
+      }
+    }
+  }
+
   removePlayer(id) {
+    const p = this.players.get(id);
+    if (p) {
+      for (const [idx, slot] of this.playerSlots) {
+        if (slot.socketId === id) {
+          this.playerSlots.delete(idx);
+          break;
+        }
+      }
+    }
     this.players.delete(id);
+  }
+
+  getConnectedPlayerCount() {
+    let count = 0;
+    for (const [, slot] of this.playerSlots) {
+      if (slot.connected) count++;
+    }
+    return count;
+  }
+
+  getTotalPlayerCount() {
+    return this.playerSlots.size;
   }
 
   startGame() {
@@ -116,7 +188,6 @@ class GameEngine {
     if (!champ) return { success: false, message: '无效的商店位置' };
     if (player.gold < champ.cost) return { success: false, message: '金币不足' };
 
-    // Find empty bench slot
     const benchIdx = player.bench.findIndex(s => s === null);
     if (benchIdx === -1) return { success: false, message: '备战席已满' };
 
@@ -124,18 +195,15 @@ class GameEngine {
     player.bench[benchIdx] = { ...champ };
     player.shop[shopIndex] = null;
 
-    // Remove from pool
     const poolIdx = this.championPool.findIndex(c => c.name === champ.name);
     if (poolIdx !== -1) this.championPool.splice(poolIdx, 1);
 
-    // Check for star-up (3 of same name + same stars => upgrade)
     this.checkStarUp(player);
 
     return { success: true };
   }
 
   checkStarUp(player) {
-    // Gather all champions (bench + board)
     const allChamps = [];
     player.bench.forEach((c, i) => { if (c) allChamps.push({ champ: c, location: 'bench', index: i }); });
     for (let r = 0; r < 4; r++) {
@@ -144,7 +212,6 @@ class GameEngine {
       }
     }
 
-    // Group by name + stars
     const groups = {};
     for (const entry of allChamps) {
       const key = `${entry.champ.name}_${entry.champ.stars}`;
@@ -154,11 +221,9 @@ class GameEngine {
 
     for (const [key, entries] of Object.entries(groups)) {
       if (entries.length >= 3 && entries[0].champ.stars < 3) {
-        // Upgrade: keep the first, remove the other two
         const keep = entries[0];
         keep.champ.stars += 1;
 
-        // Update stats with star multiplier
         const baseDef = CHAMPION_POOL.find(c => c.name === keep.champ.name);
         if (baseDef) {
           const mult = STAR_MULTIPLIERS[keep.champ.stars];
@@ -167,14 +232,12 @@ class GameEngine {
           keep.champ.abilityDmg = Math.round(baseDef.abilityDmg * mult);
         }
 
-        // Update in-place
         if (keep.location === 'bench') {
           player.bench[keep.index] = keep.champ;
         } else {
           player.board[keep.row][keep.col] = keep.champ;
         }
 
-        // Remove others
         for (let i = 1; i < 3; i++) {
           const rem = entries[i];
           if (rem.location === 'bench') {
@@ -184,7 +247,6 @@ class GameEngine {
           }
         }
 
-        // Recurse for potential further star-ups
         this.checkStarUp(player);
         return;
       }
@@ -204,11 +266,9 @@ class GameEngine {
       return { success: false, message: '无效操作' };
     }
 
-    // Refund gold based on cost and stars
     const refund = champ.cost * (champ.stars === 1 ? 1 : champ.stars === 2 ? 3 : 9);
     player.gold += refund;
 
-    // Return to pool
     const baseDef = CHAMPION_POOL.find(c => c.name === champ.name);
     if (baseDef) {
       const count = champ.stars === 1 ? 1 : champ.stars === 2 ? 3 : 9;
@@ -231,10 +291,8 @@ class GameEngine {
     const champ = player.bench[benchIndex];
     if (!champ) return { success: false, message: '备战席上没有棋子' };
 
-    // Count current board champions
     const boardCount = this.getBoardChampionCount(player);
 
-    // If target cell is occupied, swap
     if (player.board[boardRow][boardCol]) {
       const existing = player.board[boardRow][boardCol];
       player.board[boardRow][boardCol] = champ;
@@ -263,7 +321,6 @@ class GameEngine {
     const champ = player.board[fromRow][fromCol];
     if (!champ) return { success: false, message: '该位置没有棋子' };
 
-    // Swap
     const target = player.board[toRow][toCol];
     player.board[toRow][toCol] = champ;
     player.board[fromRow][fromCol] = target;
@@ -408,16 +465,13 @@ class GameEngine {
     const p1 = this.players.get(playerIds[0]);
     const p2 = this.players.get(playerIds[1]);
 
-    // Create battle units from boards
     let team1 = this.createBattleUnits(p1, 'team1');
     let team2 = this.createBattleUnits(p2, 'team2');
 
-    // Mirror team2 positions
     for (const u of team2) {
-      u.row = 3 - u.row + 4; // Place on rows 4-7
+      u.row = 3 - u.row + 4;
     }
 
-    // Apply trait bonuses
     team1 = this.applyTraitBonuses(team1, p1);
     team2 = this.applyTraitBonuses(team2, p2);
 
@@ -438,7 +492,6 @@ class GameEngine {
           const enemies = (unit.team === 'team1' ? team2 : team1).filter(e => e.currentHp > 0);
           if (enemies.length === 0) break;
 
-          // Find nearest enemy
           const target = enemies.reduce((nearest, e) => {
             const d = Math.abs(e.row - unit.row) + Math.abs(e.col - unit.col);
             return d < nearest.dist ? { enemy: e, dist: d } : nearest;
@@ -447,12 +500,10 @@ class GameEngine {
           const dist = Math.abs(target.row - unit.row) + Math.abs(target.col - unit.col);
 
           if (dist <= unit.range) {
-            // Attack
             let dmg = unit.attack;
             const isCrit = Math.random() < (unit.critChance || 0);
             if (isCrit) dmg = Math.round(dmg * 1.5);
 
-            // Armor reduction
             const armor = target.armor || 0;
             dmg = Math.max(1, Math.round(dmg * (100 / (100 + armor))));
 
@@ -460,24 +511,16 @@ class GameEngine {
             unit.attackCooldown = Math.round(10 / unit.attackSpeed);
 
             log.push({
-              tick,
-              type: isCrit ? 'crit' : 'attack',
+              tick, type: isCrit ? 'crit' : 'attack',
               attacker: { name: unit.name, team: unit.team, row: unit.row, col: unit.col, emoji: unit.emoji },
               target: { name: target.name, team: target.team, row: target.row, col: target.col, emoji: target.emoji },
-              damage: dmg,
-              targetHp: Math.max(0, target.currentHp),
-              targetMaxHp: target.maxHp,
+              damage: dmg, targetHp: Math.max(0, target.currentHp), targetMaxHp: target.maxHp,
             });
 
             if (target.currentHp <= 0) {
-              log.push({
-                tick,
-                type: 'death',
-                unit: { name: target.name, team: target.team, emoji: target.emoji },
-              });
+              log.push({ tick, type: 'death', unit: { name: target.name, team: target.team, emoji: target.emoji } });
             }
 
-            // Cast ability if mana full
             if (unit.manaCurrent >= 100 && unit.abilityDmg > 0) {
               let abilityDmg = unit.abilityDmg;
               const mr = target.magicResist || 0;
@@ -487,38 +530,24 @@ class GameEngine {
               unit.manaCurrent = 0;
 
               log.push({
-                tick,
-                type: 'ability',
+                tick, type: 'ability',
                 attacker: { name: unit.name, team: unit.team, emoji: unit.emoji, ability: unit.ability },
                 target: { name: target.name, team: target.team, emoji: target.emoji },
-                damage: abilityDmg,
-                targetHp: Math.max(0, target.currentHp),
-                targetMaxHp: target.maxHp,
+                damage: abilityDmg, targetHp: Math.max(0, target.currentHp), targetMaxHp: target.maxHp,
               });
 
               if (target.currentHp <= 0) {
-                log.push({
-                  tick,
-                  type: 'death',
-                  unit: { name: target.name, team: target.team, emoji: target.emoji },
-                });
+                log.push({ tick, type: 'death', unit: { name: target.name, team: target.team, emoji: target.emoji } });
               }
             }
           } else {
-            // Move toward target
             if (Math.abs(target.row - unit.row) > Math.abs(target.col - unit.col)) {
               unit.row += target.row > unit.row ? 1 : -1;
             } else {
               unit.col += target.col > unit.col ? 1 : -1;
             }
             unit.attackCooldown = 3;
-
-            log.push({
-              tick,
-              type: 'move',
-              unit: { name: unit.name, team: unit.team, emoji: unit.emoji },
-              to: { row: unit.row, col: unit.col },
-            });
+            log.push({ tick, type: 'move', unit: { name: unit.name, team: unit.team, emoji: unit.emoji }, to: { row: unit.row, col: unit.col } });
           }
         }
       }
@@ -530,25 +559,16 @@ class GameEngine {
 
     let winner, loser, winnerUnitsLeft;
     if (team1Alive.length > team2Alive.length) {
-      winner = playerIds[0];
-      loser = playerIds[1];
-      winnerUnitsLeft = team1Alive.length;
+      winner = playerIds[0]; loser = playerIds[1]; winnerUnitsLeft = team1Alive.length;
     } else if (team2Alive.length > team1Alive.length) {
-      winner = playerIds[1];
-      loser = playerIds[0];
-      winnerUnitsLeft = team2Alive.length;
+      winner = playerIds[1]; loser = playerIds[0]; winnerUnitsLeft = team2Alive.length;
     } else {
-      // Draw - based on remaining HP
       const hp1 = team1Alive.reduce((s, u) => s + u.currentHp, 0);
       const hp2 = team2Alive.reduce((s, u) => s + u.currentHp, 0);
       if (hp1 >= hp2) {
-        winner = playerIds[0];
-        loser = playerIds[1];
-        winnerUnitsLeft = team1Alive.length;
+        winner = playerIds[0]; loser = playerIds[1]; winnerUnitsLeft = team1Alive.length;
       } else {
-        winner = playerIds[1];
-        loser = playerIds[0];
-        winnerUnitsLeft = team2Alive.length;
+        winner = playerIds[1]; loser = playerIds[0]; winnerUnitsLeft = team2Alive.length;
       }
     }
 
@@ -562,17 +582,10 @@ class GameEngine {
         const ch = player.board[r][c];
         if (ch) {
           units.push({
-            ...ch,
-            team: teamId,
-            row: r,
-            col: c,
-            currentHp: ch.hp,
-            maxHp: ch.hp,
+            ...ch, team: teamId, row: r, col: c,
+            currentHp: ch.hp, maxHp: ch.hp,
             attackCooldown: Math.round(10 / ch.attackSpeed),
-            manaCurrent: 0,
-            armor: 0,
-            magicResist: 0,
-            critChance: 0,
+            manaCurrent: 0, armor: 0, magicResist: 0, critChance: 0,
           });
         }
       }
@@ -583,22 +596,15 @@ class GameEngine {
   applyBattleResult(result) {
     const winner = this.players.get(result.winner);
     const loser = this.players.get(result.loser);
-
     if (!winner || !loser) return;
 
-    // Damage to loser based on round + surviving units
     const damage = Math.max(2, this.round + result.winnerUnitsLeft);
     loser.hp = Math.max(0, loser.hp - damage);
 
-    // Update streaks
     winner.lastResult = 'win';
     loser.lastResult = 'loss';
-
-    if (winner.streak > 0) winner.streak++;
-    else winner.streak = 1;
-
-    if (loser.streak < 0) loser.streak--;
-    else loser.streak = -1;
+    if (winner.streak > 0) winner.streak++; else winner.streak = 1;
+    if (loser.streak < 0) loser.streak--; else loser.streak = -1;
   }
 
   checkGameOver() {
@@ -608,8 +614,7 @@ class GameEngine {
         return {
           winner: otherPlayer ? otherPlayer.id : null,
           winnerName: otherPlayer ? otherPlayer.name : 'Unknown',
-          loser: id,
-          loserName: player.name,
+          loser: id, loserName: player.name,
         };
       }
     }
@@ -622,12 +627,10 @@ class GameEngine {
     this.phaseTimer = 30;
 
     for (const [, player] of this.players) {
-      // Income: base + interest + streak
       const interest = Math.min(5, Math.floor(player.gold / 10));
       const streakBonus = Math.min(3, Math.abs(player.streak));
       player.gold += 5 + interest + streakBonus;
 
-      // XP per round
       player.xp += 2;
       while (player.xp >= player.xpToLevel && player.level < 7) {
         player.xp -= player.xpToLevel;
@@ -648,6 +651,7 @@ class GameEngine {
 
     return {
       playerId,
+      roomCode: this.roomCode,
       phase: this.phase,
       round: this.round,
       timer: this.phaseTimer,
@@ -671,7 +675,7 @@ class GameEngine {
         hp: opponent.hp,
         level: opponent.level,
         boardCount: this.getBoardChampionCount(opponent),
-        board: opponent.board, // Visible for auto-battler
+        board: opponent.board,
       } : null,
     };
   }

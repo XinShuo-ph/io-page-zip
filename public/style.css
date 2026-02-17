@@ -88,6 +88,30 @@ body {
   animation: pulse 1.5s ease-in-out infinite;
 }
 
+/* Rejoin bar */
+.rejoin-bar {
+  margin-bottom: 1rem;
+  padding: 1rem;
+  background: rgba(74, 158, 255, 0.1);
+  border: 2px solid var(--blue);
+  border-radius: 12px;
+  text-align: center;
+}
+
+.rejoin-bar p { font-size: 0.9rem; margin-bottom: 0.3rem; }
+.rejoin-detail { font-size: 0.8rem; color: var(--text-dim); margin-bottom: 0.6rem !important; }
+.rejoin-detail strong { color: var(--gold); font-size: 1.1rem; letter-spacing: 0.1em; }
+
+.rejoin-buttons { display: flex; gap: 0.5rem; }
+.btn-rejoin { flex: 2; padding: 0.6rem; font-size: 0.9rem; }
+.btn-rejoin-dismiss { flex: 1; padding: 0.6rem; font-size: 0.8rem; }
+
+.btn-leave {
+  background: rgba(239, 68, 68, 0.15) !important;
+  border-color: var(--red) !important;
+  color: var(--red) !important;
+}
+
 .description {
   color: var(--text-dim);
   margin-bottom: 1.5rem;

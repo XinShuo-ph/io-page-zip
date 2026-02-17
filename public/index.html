@@ -15,6 +15,16 @@
       <div id="connectionStatus" class="connection-status disconnected">🔴 连接中...</div>
       <p class="description">招募棋子、搭配羁绊、自动战斗！双人对战小游戏</p>
 
+      <!-- 重连提示条 -->
+      <div id="rejoinBar" class="rejoin-bar" style="display:none">
+        <p>你有一局未完成的游戏</p>
+        <p class="rejoin-detail">房间 <strong id="rejoinRoomCode">----</strong> · <span id="rejoinName">--</span></p>
+        <div class="rejoin-buttons">
+          <button class="btn btn-primary btn-rejoin" onclick="doRejoin()">🔄 回到游戏</button>
+          <button class="btn btn-secondary btn-rejoin-dismiss" onclick="dismissRejoin()">✖ 放弃</button>
+        </div>
+      </div>
+
       <!-- 主菜单 -->
       <div id="lobbyMenu" class="lobby-form">
         <input type="text" id="playerName" placeholder="输入你的昵称" maxlength="12" class="input-field">
@@ -127,6 +137,7 @@
         <div class="shop-buttons">
           <button class="btn btn-sm" onclick="buyXP()">📈 买经验(4💰)</button>
           <button class="btn btn-sm" onclick="refreshShop()">🔄 刷新(2💰)</button>
+          <button class="btn btn-sm btn-leave" onclick="leaveGame()">🚪 退出</button>
         </div>
       </div>
       <div class="shop-cards" id="shopCards"></div>
