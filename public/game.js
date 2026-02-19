@@ -356,12 +356,12 @@ function closeCardDetail() {
 
 // 长按检测（用于查看棋子详情）
 function startLongPress(unit, e) {
-  if (e) e.preventDefault();
+  // 不能 preventDefault — 否则 mobile 上 click 事件会被吞掉
   clearTimeout(longPressTimer);
   longPressTimer = setTimeout(() => {
     showCardDetail(unit);
     longPressTimer = -1; // mark as triggered
-  }, 400);
+  }, 500);
 }
 
 function cancelLongPress() {
@@ -372,7 +372,11 @@ function cancelLongPress() {
 }
 
 function wasLongPress() {
-  return longPressTimer === -1;
+  if (longPressTimer === -1) {
+    longPressTimer = null;
+    return true;
+  }
+  return false;
 }
 
 // ===== 新手提示 =====
@@ -488,7 +492,7 @@ function renderPlayerBoard() {
 }
 
 function onBoardTap(r, c) {
-  if (wasLongPress()) { longPressTimer = null; return; }
+  if (wasLongPress()) return;
   onBoardCellClick(r, c);
 }
 
@@ -517,7 +521,7 @@ function renderBench() {
 }
 
 function onBenchTap(i) {
-  if (wasLongPress()) { longPressTimer = null; return; }
+  if (wasLongPress()) return;
   onBenchClick(i);
 }
 
@@ -552,7 +556,7 @@ function renderShop() {
 }
 
 function onShopClick(i) {
-  if (wasLongPress()) { longPressTimer = null; return; }
+  if (wasLongPress()) return;
   buyChampion(i);
 }
 
