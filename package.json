@@ -1,0 +1,27 @@
+{
+  "name": "workspace",
+  "version": "1.0.0",
+  "description": "",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/XinShuo-ph/io-page-zip.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/XinShuo-ph/io-page-zip/issues"
+  },
+  "homepage": "https://github.com/XinShuo-ph/io-page-zip#readme",
+  "dependencies": {
+    "express": "^5.2.1",
+    "peerjs": "^1.5.5",
+    "socket.io": "^4.8.3",
+    "socket.io-client": "^4.8.3"
+  }
+}
